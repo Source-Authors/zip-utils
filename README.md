@@ -1,5 +1,8 @@
 # Zip Utils - clean, elegant, simple, C++
 
+[![Build](https://github.com/Source-Authors/zip-utils/actions/workflows/build.yml/badge.svg)](https://github.com/Source-Authors/zip-utils/actions/workflows/build.yml)
+[![GitHub Repo Size in Bytes](https://img.shields.io/github/repo-size/Source-Authors/zip-utils.svg)](https://github.com/Source-Authors/zip-utils)
+
 Adding zip/unzip easily, no LIBS or DLLs, with an elegant and simple API.
 Latest source code can be found at https://www.wischik.com/lu/programmer/zip_utils_src.zip
 
