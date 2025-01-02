@@ -1,7 +1,9 @@
-# XZip / XUnzip
+# Zip Utils - clean, elegant, simple
+#
+# See https://www.wischik.com/lu/programmer/zip_utils.html
 
 cmake_minimum_required(VERSION 3.5)
-project(xzip VERSION 1.3.0 LANGUAGES CXX)
+project(zip-utils VERSION 1.3.0 LANGUAGES CXX)
 
 # C++ standard can be overridden when this is used as a sub-project.
 if(NOT CMAKE_CXX_STANDARD)
@@ -77,9 +79,9 @@ endif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 # it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
-add_library(xzip "")
+add_library(zip-utils "")
 
-target_sources(xzip
+target_sources(zip-utils
   PRIVATE
     "XZip.cpp"
     "XUnzip.cpp"
@@ -88,15 +90,15 @@ target_sources(xzip
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/XZip.h>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/XUnzip.h>
 )
-target_include_directories(xzip
+target_include_directories(zip-utils
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
 )
 
-target_compile_features(xzip PRIVATE cxx_std_17)
-set_target_properties(xzip
+target_compile_features(zip-utils PRIVATE cxx_std_17)
+set_target_properties(zip-utils
   PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
 
 if (BUILD_SHARED_LIBS)
-  set_target_properties(xzip PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+  set_target_properties(zip-utils PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif(BUILD_SHARED_LIBS)
