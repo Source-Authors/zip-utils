@@ -153,7 +153,7 @@ typedef unsigned char BYTE;
 
 // THIS FILE is almost entirely based upon code by Jean-loup Gailly
 // and Mark Adler. It has been modified by Lucian Wischik.
-// The original code may be found at http://www.gzip.org/
+// The original code may be found at https://zlib.net/
 // The original copyright text follows.
 //
 //
@@ -4429,7 +4429,7 @@ ZRESULT CloseZipU(HZIP hz)
 }
 
 bool IsZipHandleU(HZIP hz)
-{ if (hz==0) return true;
+{ if (hz==0) return false;
   TUnzipHandleData *han = (TUnzipHandleData*)hz;
   return (han->flag==1);
 }
