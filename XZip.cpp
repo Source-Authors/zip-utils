@@ -338,19 +338,19 @@ typedef unsigned IPos;  // A Pos is an index in the character window. Pos is
 
 namespace {
 
-const int extra_lbits[LENGTH_CODES]  // extra bits for each length code
+constexpr int extra_lbits[LENGTH_CODES]  // extra bits for each length code
     = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
        2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
 
-const int extra_dbits[D_CODES]  // extra bits for each distance code
+constexpr int extra_dbits[D_CODES]  // extra bits for each distance code
     = {0, 0, 0, 0, 1, 1, 2, 2,  3,  3,  4,  4,  5,  5,  6,
        6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
 
-const int extra_blbits[BL_CODES]  // extra bits for each bit length code
+constexpr int extra_blbits[BL_CODES]  // extra bits for each bit length code
     = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7};
 
-const uch bl_order[BL_CODES] = {16, 17, 18, 0, 8,  7, 9,  6, 10, 5,
-                                11, 4,  12, 3, 13, 2, 14, 1, 15};
+constexpr uch bl_order[BL_CODES] = {16, 17, 18, 0, 8,  7, 9,  6, 10, 5,
+                                    11, 4,  12, 3, 13, 2, 14, 1, 15};
 // The lengths of the bit length codes are sent in order of decreasing
 // probability, to avoid transmitting the lengths for unused bit length codes.
 
@@ -367,7 +367,7 @@ typedef struct config {
 // Better values may be found for specific files.
 //
 
-const config configuration_table[10] = {
+constexpr config configuration_table[10] = {
     //  good lazy nice chain
     {0, 0, 0, 0},           // 0 store only
     {4, 4, 8, 4},           // 1 maximum speed, no lazy matches
@@ -2240,7 +2240,7 @@ int putend(
   return ZE_OK;
 }
 
-const ulg crc_table[256] = {
+constexpr ulg crc_table[256] = {
     0x00000000L, 0x77073096L, 0xee0e612cL, 0x990951baL, 0x076dc419L,
     0x706af48fL, 0xe963a535L, 0x9e6495a3L, 0x0edb8832L, 0x79dcb8a4L,
     0xe0d5e91eL, 0x97d2d988L, 0x09b64c2bL, 0x7eb17cbdL, 0xe7b82d07L,

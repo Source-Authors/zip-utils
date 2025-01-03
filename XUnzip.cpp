@@ -524,16 +524,16 @@ typedef unsigned short ush;
 typedef ush ushf;
 typedef unsigned long ulg;
 
-const char *const z_errmsg[10] = {  // indexed by 2-zlib_error
-    "need dictionary",              // Z_NEED_DICT       2
-    "stream end",                   // Z_STREAM_END      1
-    "",                             // Z_OK              0
-    "file error",                   // Z_ERRNO         (-1)
-    "stream error",                 // Z_STREAM_ERROR  (-2)
-    "data error",                   // Z_DATA_ERROR    (-3)
-    "insufficient memory",          // Z_MEM_ERROR     (-4)
-    "buffer error",                 // Z_BUF_ERROR     (-5)
-    "incompatible version",         // Z_VERSION_ERROR (-6)
+constexpr char *const z_errmsg[10] = {  // indexed by 2-zlib_error
+    "need dictionary",                  // Z_NEED_DICT       2
+    "stream end",                       // Z_STREAM_END      1
+    "",                                 // Z_OK              0
+    "file error",                       // Z_ERRNO         (-1)
+    "stream error",                     // Z_STREAM_ERROR  (-2)
+    "data error",                       // Z_DATA_ERROR    (-3)
+    "insufficient memory",              // Z_MEM_ERROR     (-4)
+    "buffer error",                     // Z_BUF_ERROR     (-5)
+    "incompatible version",             // Z_VERSION_ERROR (-6)
     ""};
 
 #define ERR_MSG(err) z_errmsg[Z_NEED_DICT - (err)]
@@ -794,9 +794,9 @@ struct inflate_blocks_state {
 
 // masks for lower bits (size given to avoid silly warnings with Visual C++)
 // And'ing with mask[n] masks the lower n bits
-const uInt inflate_mask[17] = {0x0000, 0x0001, 0x0003, 0x0007, 0x000f, 0x001f,
-                               0x003f, 0x007f, 0x00ff, 0x01ff, 0x03ff, 0x07ff,
-                               0x0fff, 0x1fff, 0x3fff, 0x7fff, 0xffff};
+constexpr uInt inflate_mask[17] = {
+    0x0000, 0x0001, 0x0003, 0x0007, 0x000f, 0x001f, 0x003f, 0x007f, 0x00ff,
+    0x01ff, 0x03ff, 0x07ff, 0x0fff, 0x1fff, 0x3fff, 0x7fff, 0xffff};
 
 // copy as much as possible from the sliding window to the output area
 int inflate_flush(inflate_blocks_statef *, z_streamp, int);
@@ -804,9 +804,9 @@ int inflate_flush(inflate_blocks_statef *, z_streamp, int);
 int inflate_fast(uInt, uInt, const inflate_huft *, const inflate_huft *,
                  inflate_blocks_statef *, z_streamp);
 
-const uInt fixed_bl = 9;
-const uInt fixed_bd = 5;
-const inflate_huft fixed_tl[] = {
+constexpr uInt fixed_bl = 9;
+constexpr uInt fixed_bd = 5;
+constexpr inflate_huft fixed_tl[] = {
     {{{96, 7}}, 256}, {{{0, 8}}, 80},  {{{0, 8}}, 16}, {{{84, 8}}, 115},
     {{{82, 7}}, 31},  {{{0, 8}}, 112}, {{{0, 8}}, 48}, {{{0, 9}}, 192},
     {{{80, 7}}, 10},  {{{0, 8}}, 96},  {{{0, 8}}, 32}, {{{0, 9}}, 160},
@@ -935,7 +935,7 @@ const inflate_huft fixed_tl[] = {
     {{{84, 7}}, 99},  {{{0, 8}}, 127}, {{{0, 8}}, 63}, {{{0, 9}}, 223},
     {{{82, 7}}, 27},  {{{0, 8}}, 111}, {{{0, 8}}, 47}, {{{0, 9}}, 191},
     {{{0, 8}}, 15},   {{{0, 8}}, 143}, {{{0, 8}}, 79}, {{{0, 9}}, 255}};
-const inflate_huft fixed_td[] = {
+constexpr inflate_huft fixed_td[] = {
     {{{80, 5}}, 1},  {{{87, 5}}, 257},  {{{83, 5}}, 17},  {{{91, 5}}, 4097},
     {{{81, 5}}, 5},  {{{89, 5}}, 1025}, {{{85, 5}}, 65},  {{{93, 5}}, 16385},
     {{{80, 5}}, 3},  {{{88, 5}}, 513},  {{{84, 5}}, 33},  {{{92, 5}}, 8193},
@@ -1236,7 +1236,7 @@ void inflate_codes_free(inflate_codes_statef *c, z_streamp z) {
 // struct inflate_codes_state {int dummy;}; // for buggy compilers
 
 // Table for deflate from PKZIP's appnote.txt.
-const uInt border[] = {  // Order of the bit length code lengths
+constexpr uInt border[] = {  // Order of the bit length code lengths
     16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
 
 //
@@ -1583,18 +1583,18 @@ int huft_build(uInt *,           // code lengths in bits
                uInt *);          // space for values
 
 // Tables for deflate from PKZIP's appnote.txt.
-const uInt cplens[31] = {  // Copy lengths for literal codes 257..285
+constexpr uInt cplens[31] = {  // Copy lengths for literal codes 257..285
     3,  4,  5,  6,  7,  8,  9,  10,  11,  13,  15,  17,  19,  23, 27, 31,
     35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0,  0};
 // see note #13 above about 258
-const uInt cplext[31] = {  // Extra bits for literal codes 257..285
+constexpr uInt cplext[31] = {  // Extra bits for literal codes 257..285
     0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2,   2,  2,
     3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0, 112, 112};  // 112==invalid
-const uInt cpdist[30] = {  // Copy offsets for distance codes 0..29
+constexpr uInt cpdist[30] = {  // Copy offsets for distance codes 0..29
     1,    2,    3,    4,    5,    7,    9,    13,    17,    25,
     33,   49,   65,   97,   129,  193,  257,  385,   513,   769,
     1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577};
-const uInt cpdext[30] = {  // Extra bits for distance codes
+constexpr uInt cpdext[30] = {  // Extra bits for distance codes
     0, 0, 0, 0, 1, 1, 2, 2,  3,  3,  4,  4,  5,  5,  6,
     6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
 
@@ -2076,7 +2076,7 @@ int inflate_fast(
 // @(#) $Id$
 
 // Table of CRC-32's of all single-byte values (made by make_crc_table)
-const uLong crc_table[256] = {
+constexpr uLong crc_table[256] = {
     0x00000000L, 0x77073096L, 0xee0e612cL, 0x990951baL, 0x076dc419L,
     0x706af48fL, 0xe963a535L, 0x9e6495a3L, 0x0edb8832L, 0x79dcb8a4L,
     0xe0d5e91eL, 0x97d2d988L, 0x09b64c2bL, 0x7eb17cbdL, 0xe7b82d07L,
@@ -2504,7 +2504,7 @@ int inflate(z_streamp z, int f) {
 #define SIZECENTRALDIRITEM (0x2e)
 #define SIZEZIPLOCALHEADER (0x1e)
 
-const char unz_copyright[] = " unzip 0.15 Copyright 1998 Gilles Vollant ";
+constexpr char unz_copyright[] = " unzip 0.15 Copyright 1998 Gilles Vollant ";
 
 // unz_file_info_interntal contain internal info about a file in zipfile
 typedef struct unz_file_info_internal_s {
