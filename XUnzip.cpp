@@ -441,37 +441,6 @@ int inflateEnd(z_streamp strm);
 
 //  The following functions are needed only in some special applications.
 
-int inflateSetDictionary(z_streamp strm, const Byte *dictionary,
-                         uInt dictLength);
-//
-//     Initializes the decompression dictionary from the given uncompressed byte
-//   sequence. This function must be called immediately after a call of inflate
-//   if this call returned Z_NEED_DICT. The dictionary chosen by the compressor
-//   can be determined from the Adler32 value returned by this call of
-//   inflate. The compressor and decompressor must use exactly the same
-//   dictionary.
-//
-//     inflateSetDictionary returns Z_OK if success, Z_STREAM_ERROR if a
-//   parameter is invalid (such as NULL dictionary) or the stream state is
-//   inconsistent, Z_DATA_ERROR if the given dictionary doesn't match the
-//   expected one (incorrect Adler32 value). inflateSetDictionary does not
-//   perform any decompression: this will be done by subsequent calls of
-//   inflate().
-
-int inflateSync(z_streamp strm);
-//
-//    Skips invalid compressed data until a full flush point can be found, or
-//    until all
-//  available input is skipped. No output is provided.
-//
-//    inflateSync returns Z_OK if a full flush point has been found, Z_BUF_ERROR
-//  if no more input was provided, Z_DATA_ERROR if no flush point has been
-//  found, or Z_STREAM_ERROR if the stream structure was inconsistent. In the
-//  success case, the application may save the current current value of total_in
-//  which indicates where valid compressed data was found. In the error case,
-//  the application may repeatedly call inflateSync, providing more input each
-//  time, until success or end of the input data.
-
 int inflateReset(z_streamp strm);
 //     This function is equivalent to inflateEnd followed by inflateInit,
 //   but does not free and reallocate all the internal decompression state.
@@ -515,7 +484,6 @@ uLong ucrc32(uLong crc, const Byte *buf, uInt len);
 //     if (crc != original_crc) error();
 
 const char *zError(int err);
-int inflateSyncPoint(z_streamp z);
 const uLong *get_crc_table(void);
 
 typedef unsigned char uch;
@@ -646,12 +614,6 @@ void inflate_blocks_reset(inflate_blocks_statef *, z_streamp,
                           uLong *);  // check value on output
 
 int inflate_blocks_free(inflate_blocks_statef *, z_streamp);
-
-void inflate_set_dictionary(inflate_blocks_statef *s,
-                            const Byte *d,  // dictionary
-                            uInt n);        // dictionary length
-
-int inflate_blocks_sync_point(inflate_blocks_statef *s);
 
 struct inflate_codes_state;
 typedef struct inflate_codes_state inflate_codes_statef;
@@ -3650,7 +3612,6 @@ int unzGetGlobalComment(unzFile file, char *szComment,
 }
 
 int unzOpenCurrentFile(unzFile file, const char *password);
-int unzReadCurrentFile(unzFile file, void *buf, unsigned len);
 int unzCloseCurrentFile(unzFile file);
 
 class TUnzip {
