@@ -2369,7 +2369,7 @@ class TZip {
         obuf(0),
         hfin(0),
         writ(0),
-        oerr(false),
+        oerr(ZR_OK),
         hasputcen(false),
         ooffset(0),
         encwriting(false),

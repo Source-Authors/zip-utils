@@ -4125,10 +4125,10 @@ ZRESULT TUnzip::Unzip(int index, void *dst, unsigned int len, DWORD flags) {
   if (h == INVALID_HANDLE_VALUE) return ZR_NOFILE;
   unzOpenCurrentFile(uf, password);
   if (unzbuf == 0) unzbuf = new char[16384];
-  DWORD haderr = 0;
+  ZRESULT haderr = ZR_OK;
   //
 
-  for (; haderr == 0;) {
+  for (; haderr == ZR_OK;) {
     bool reached_eof;
     int res = unzReadCurrentFile(uf, unzbuf, 16384, &reached_eof);
     if (res == UNZ_PASSWORD) {
@@ -4175,15 +4175,14 @@ ZRESULT TUnzip::Unzip(int index, void *dst, unsigned int len, DWORD flags) {
 #else
   static_assert(alignof(ZIP_FILETIME) == alignof(FILETIME));
   static_assert(sizeof(ZIP_FILETIME) == sizeof(FILETIME));
-  if (!haderr)
+  if (haderr == ZR_OK)
     SetFileTime(
         h, reinterpret_cast<FILETIME *>(&ze.ctime),
         reinterpret_cast<FILETIME *>(&ze.atime),
         reinterpret_cast<FILETIME *>(&ze.mtime));  // may fail if it was a pipe
   if (flags != ZIP_HANDLE) CloseHandle(h);
 #endif
-  if (haderr != 0) return haderr;
-  return ZR_OK;
+  return haderr;
 }
 
 ZRESULT TUnzip::Close() {
