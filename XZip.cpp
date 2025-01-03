@@ -2965,7 +2965,7 @@ ZRESULT ZipAddFolder(HZIP hz,const TCHAR *dstzn) {return ZipAddInternal(hz,dstzn
 ZRESULT ZipGetMemory(HZIP hz, void **buf, unsigned long *len)
 { if (hz==0) {if (buf!=0) *buf=0; if (len!=0) *len=0; lasterrorZ=ZR_ARGS;return ZR_ARGS;}
   TZipHandleData *han = (TZipHandleData*)hz;
-  if (han->flag!=2) {lasterrorZ=ZR_ZMODE;return ZR_ZMODE;}
+  if (han->flag!=2) {if (buf!=0) *buf=0; if (len!=0) *len=0; lasterrorZ=ZR_ZMODE;return ZR_ZMODE;}
   TZip *zip = han->zip;
   lasterrorZ = zip->GetMemory(buf,len);
   return lasterrorZ;
