@@ -215,15 +215,6 @@ ZRESULT ZipAddFolder(HZIP hz, const TCHAR *dstzn);
 // NOTE: you can't add any more after calling this.
 ZRESULT ZipGetMemory(HZIP hz, void **buf, unsigned long *len);
 
-// CloseZip - the zip handle must be closed with this function.
-ZRESULT CloseZip(HZIP hz);
-
-// FormatZipMessage - given an error code, formats it as a string.
-//
-// It returns the length of the error message.  If buf/len points to a real
-// buffer, then it also writes as much as possible into there.
-unsigned int FormatZipMessage(ZRESULT code, TCHAR *buf, unsigned int len);
-
 // Now we indulge in a little skullduggery so that the code works whether the
 // user has included just zip or both zip and unzip.
 //
@@ -232,14 +223,26 @@ unsigned int FormatZipMessage(ZRESULT code, TCHAR *buf, unsigned int len);
 // other of them based on a dynamic choice.  If the header file for only one is
 // present, then we will bind to that particular one.
 ZRESULT CloseZipZ(HZIP hz);
+
+// FormatZipMessage - given an error code, formats it as a string.
+//
+// It returns the length of the error message.  If buf/len points to a real
+// buffer, then it also writes as much as possible into there.
 unsigned int FormatZipMessageZ(ZRESULT code, char *buf, unsigned int len);
 bool IsZipHandleZ(HZIP hz);
 
 #ifdef ZIP_UTILS_XUNZIP_H_
 #undef CloseZip
+// CloseZip - the zip handle must be closed with this function.
 #define CloseZip(hz) (IsZipHandleZ(hz) ? CloseZipZ(hz) : CloseZipU(hz))
 #else
+// CloseZip - the zip handle must be closed with this function.
 #define CloseZip CloseZipZ
+
+// FormatZipMessage - given an error code, formats it as a string.
+//
+// It returns the length of the error message.  If buf/len points to a real
+// buffer, then it also writes as much as possible into there.
 #define FormatZipMessage FormatZipMessageZ
 #endif
 
