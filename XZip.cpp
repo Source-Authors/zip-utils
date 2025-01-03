@@ -2488,11 +2488,11 @@ unsigned int TZip::write(const char *inbuf,unsigned int size)
   else if (hfout!=0)
   {
 #ifdef ZIP_STD
-    DWORD writ=(DWORD)fwrite(srcbuf,1,size,hfout);
+    DWORD bytes=(DWORD)fwrite(srcbuf,1,size,hfout);
 #else
-    DWORD writ; WriteFile(hfout,srcbuf,size,&writ,NULL);
+    DWORD bytes; WriteFile(hfout,srcbuf,size,&bytes,NULL);
 #endif
-    return writ;
+    return bytes;
   }
   oerr=ZR_NOTINITED; return 0;
 }
@@ -2805,7 +2805,7 @@ ZRESULT TZip::Add(const TCHAR *odstzn, void *src,unsigned int len, DWORD flags)
 #ifdef ZIP_STD
   if (!has_seeded) srand((unsigned)time(0));
 #else
-  if (!has_seeded) srand(GetTickCount()^(unsigned long)GetDesktopWindow());
+  if (!has_seeded) srand((unsigned)(GetTickCount64()^(ULONGLONG)GetDesktopWindow()));
 #endif
   char encbuf[12]; for (int i=0; i<12; i++) encbuf[i]=(char)((rand()>>7)&0xff);
   encbuf[11] = (char)((zfi.tim>>8)&0xff);
