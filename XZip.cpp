@@ -336,6 +336,8 @@ typedef unsigned IPos;  // A Pos is an index in the character window. Pos is
 // is not greater than this length. This saves time but degrades compression.
 // max_insert_length is used only for compression levels <= 3.
 
+namespace {
+
 const int extra_lbits[LENGTH_CODES]  // extra bits for each length code
     = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
        2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
@@ -2163,8 +2165,8 @@ ulg deflate(TState &state) {
 }
 
 int putlocal(struct zlist *z, WRITEFUNC wfunc,
-             void *param) {  // Write a local header described by *z to file *f.
-                             // Return a ZE_ error code.
+             void *param) {  // Write a local header described by *z to
+                             // file *f. Return a ZE_ error code.
   PUTLG(LOCSIG, f);
   PUTSH(z->ver, f);
   PUTSH(z->lflg, f);
@@ -2195,8 +2197,8 @@ int putextended(struct zlist *z, WRITEFUNC wfunc,
 }
 
 int putcentral(struct zlist *z, WRITEFUNC wfunc,
-               void *param) {  // Write a central header entry of *z to file *f.
-                               // Returns a ZE_ code.
+               void *param) {  // Write a central header entry of *z to
+                               // file *f. Returns a ZE_ code.
   PUTLG(CENSIG, f);
   PUTSH(z->vem, f);
   PUTSH(z->ver, f);
@@ -2414,8 +2416,8 @@ class TZip {
   //
   TZipFileInfo *zfis;  // each file gets added onto this list, for writing the
                        // table at the end
-  TState
-      *state;  // we use just one state object per zip, because it's big (500k)
+  // we use just one state object per zip, because it's big (500k)
+  TState *state;
 
   ZRESULT Create(void *z, unsigned int len, DWORD flags);
   static unsigned sflush(void *param, const char *buf, unsigned *size);
@@ -2600,15 +2602,13 @@ bool TZip::oseek(unsigned int pos) {
   return 0;
 }
 
-ZRESULT TZip::GetMemory(
-    void **pbuf,
-    unsigned long *
-        plen) {  // When the user calls GetMemory, they're presumably at the end
-  // of all their adding. In any case, we have to add the central
-  // directory now, otherwise the memory we tell them won't be complete.
+// When the user calls GetMemory, they're presumably at the end of all their
+// adding.  In any case, we have to add the central directory now, otherwise the
+// memory we tell them won't be complete.
+ZRESULT TZip::GetMemory(void **pbuf, unsigned long *plen) {
   if (!hasputcen) AddCentral();
   hasputcen = true;
-  if (pbuf != NULL) *pbuf = (void *)obuf;
+  if (pbuf != NULL) *pbuf = obuf;
   if (plen != NULL) *plen = writ;
   if (obuf == NULL) return ZR_NOTMMAP;
   return ZR_OK;
@@ -2845,7 +2845,6 @@ bool has_seeded = false;
 ZRESULT TZip::Add(const TCHAR *odstzn, void *src, unsigned int len,
                   DWORD flags) {
   if (odstzn == nullptr) return ZR_ARGS;
-  if (src == nullptr || len == 0) return ZR_ARGS;
   if (oerr) return ZR_FAILED;
   if (hasputcen) return ZR_ENDED;
 
@@ -3082,8 +3081,54 @@ ZRESULT TZip::AddCentral() {  // write central directory
   if (!okay) return ZR_WRITE;
   return ZR_OK;
 }
+
+struct TZipHandleData {
+  DWORD flag;
+  TZip *zip;
+};
+
 // dimhotepus: Add thread_local.
-static thread_local ZRESULT lasterrorZ = ZR_OK;
+thread_local ZRESULT lasterrorZ = ZR_OK;
+
+HZIP CreateZipInternal(void *z, unsigned int len, DWORD flags,
+                       const char *password) {
+  auto *zip = new TZip(password);
+
+  ZRESULT rc = zip->Create(z, len, flags);
+  if (rc != ZR_OK) {
+    delete zip;
+    lasterrorZ = rc;
+    return nullptr;
+  }
+
+  auto *han = new TZipHandleData;
+  han->flag = 2;
+  han->zip = zip;
+
+  return reinterpret_cast<HZIP>(han);
+}
+
+ZRESULT ZipAddInternal(HZIP hz, const TCHAR *dstzn, void *src, unsigned int len,
+                       DWORD flags) {
+  if (hz == nullptr) {
+    lasterrorZ = ZR_ARGS;
+    return ZR_ARGS;
+  }
+
+  auto *han = reinterpret_cast<TZipHandleData *>(hz);
+  if (han->flag != 2) {
+    lasterrorZ = ZR_ZMODE;
+    return ZR_ZMODE;
+  }
+
+  TZip *zip = han->zip;
+  ZRESULT rc = zip->Add(dstzn, src, len, flags);
+
+  lasterrorZ = rc;
+  return rc;
+}
+
+}  // namespace
 
 unsigned int FormatZipMessageZ(ZRESULT code, char *buf, unsigned int len) {
   if (code == ZR_RECENT) code = lasterrorZ;
@@ -3167,28 +3212,6 @@ unsigned int FormatZipMessageZ(ZRESULT code, char *buf, unsigned int len) {
   return mlen;
 }
 
-struct TZipHandleData {
-  DWORD flag;
-  TZip *zip;
-};
-
-static HZIP CreateZipInternal(void *z, unsigned int len, DWORD flags,
-                              const char *password) {
-  auto *zip = new TZip(password);
-
-  ZRESULT rc = zip->Create(z, len, flags);
-  if (rc != ZR_OK) {
-    delete zip;
-    lasterrorZ = rc;
-    return nullptr;
-  }
-
-  auto *han = new TZipHandleData;
-  han->flag = 2;
-  han->zip = zip;
-
-  return reinterpret_cast<HZIP>(han);
-}
 HZIP CreateZipHandle(HANDLE h, const char *password) {
   return CreateZipInternal(h, 0, ZIP_HANDLE, password);
 }
@@ -3199,25 +3222,6 @@ HZIP CreateZip(void *z, unsigned int len, const char *password) {
   return CreateZipInternal(z, len, ZIP_MEMORY, password);
 }
 
-static ZRESULT ZipAddInternal(HZIP hz, const TCHAR *dstzn, void *src,
-                              unsigned int len, DWORD flags) {
-  if (hz == nullptr) {
-    lasterrorZ = ZR_ARGS;
-    return ZR_ARGS;
-  }
-
-  auto *han = reinterpret_cast<TZipHandleData *>(hz);
-  if (han->flag != 2) {
-    lasterrorZ = ZR_ZMODE;
-    return ZR_ZMODE;
-  }
-
-  TZip *zip = han->zip;
-  ZRESULT rc = zip->Add(dstzn, src, len, flags);
-
-  lasterrorZ = rc;
-  return rc;
-}
 ZRESULT ZipAdd(HZIP hz, const TCHAR *dstzn, const TCHAR *fn) {
   return ZipAddInternal(hz, dstzn, (void *)fn, 0, ZIP_FILENAME);
 }

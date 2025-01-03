@@ -124,6 +124,8 @@ typedef unsigned short WORD;
 
 #define zfree(p) free(p)
 
+namespace {
+
 // define it ourselves since we don't include time.h
 typedef unsigned long lutime_t;
 
@@ -4164,8 +4166,54 @@ ZRESULT TUnzip::Close() {
   uf = 0;
   return ZR_OK;
 }
+
 // dimhotepus: Add thread_local.
-static thread_local ZRESULT lasterrorU = ZR_OK;
+thread_local ZRESULT lasterrorU = ZR_OK;
+
+struct TUnzipHandleData {
+  DWORD flag;
+  TUnzip *unz;
+};
+
+HZIP OpenZipInternal(void *z, unsigned int len, DWORD flags,
+                     const char *password) {
+  auto *unz = new TUnzip(password);
+
+  ZRESULT rc = unz->Open(z, len, flags);
+  if (rc != ZR_OK) {
+    delete unz;
+    lasterrorU = rc;
+    return 0;
+  }
+
+  auto *han = new TUnzipHandleData;
+  han->flag = 1;
+  han->unz = unz;
+
+  return reinterpret_cast<HZIP>(han);
+}
+
+ZRESULT UnzipItemInternal(HZIP hz, int index, void *dst, unsigned int len,
+                          DWORD flags) {
+  if (hz == nullptr) {
+    lasterrorU = ZR_ARGS;
+    return ZR_ARGS;
+  }
+
+  auto *han = reinterpret_cast<TUnzipHandleData *>(hz);
+  if (han->flag != 1) {
+    lasterrorU = ZR_ZMODE;
+    return ZR_ZMODE;
+  }
+
+  TUnzip *unz = han->unz;
+  ZRESULT rc = unz->Unzip(index, dst, len, flags);
+
+  lasterrorU = rc;
+  return rc;
+}
+
+}  // namespace
 
 unsigned int FormatZipMessageU(ZRESULT code, TCHAR *buf, unsigned int len) {
   if (code == ZR_RECENT) code = lasterrorU;
@@ -4252,28 +4300,6 @@ unsigned int FormatZipMessageU(ZRESULT code, TCHAR *buf, unsigned int len) {
   return mlen;
 }
 
-struct TUnzipHandleData {
-  DWORD flag;
-  TUnzip *unz;
-};
-
-static HZIP OpenZipInternal(void *z, unsigned int len, DWORD flags,
-                            const char *password) {
-  auto *unz = new TUnzip(password);
-
-  ZRESULT rc = unz->Open(z, len, flags);
-  if (rc != ZR_OK) {
-    delete unz;
-    lasterrorU = rc;
-    return 0;
-  }
-
-  auto *han = new TUnzipHandleData;
-  han->flag = 1;
-  han->unz = unz;
-
-  return reinterpret_cast<HZIP>(han);
-}
 HZIP OpenZipHandle(HANDLE h, const char *password) {
   return OpenZipInternal((void *)h, 0, ZIP_HANDLE, password);
 }
@@ -4329,25 +4355,6 @@ ZRESULT FindZipItem(HZIP hz, const TCHAR *name, bool ic, int *index,
   return rc;
 }
 
-static ZRESULT UnzipItemInternal(HZIP hz, int index, void *dst,
-                                 unsigned int len, DWORD flags) {
-  if (hz == nullptr) {
-    lasterrorU = ZR_ARGS;
-    return ZR_ARGS;
-  }
-
-  auto *han = reinterpret_cast<TUnzipHandleData *>(hz);
-  if (han->flag != 1) {
-    lasterrorU = ZR_ZMODE;
-    return ZR_ZMODE;
-  }
-
-  TUnzip *unz = han->unz;
-  ZRESULT rc = unz->Unzip(index, dst, len, flags);
-
-  lasterrorU = rc;
-  return rc;
-}
 ZRESULT UnzipItemHandle(HZIP hz, int index, HANDLE h) {
   return UnzipItemInternal(hz, index, (void *)h, 0, ZIP_HANDLE);
 }
