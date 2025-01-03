@@ -1,5 +1,5 @@
-#ifndef _unzip_H
-#define _unzip_H
+#ifndef ZIP_UTILS_XUNZIP_H_
+#define ZIP_UTILS_XUNZIP_H_
 //
 #ifdef ZIP_STD
 #include <time.h>
@@ -222,7 +222,7 @@ unsigned int FormatZipMessage(ZRESULT code, TCHAR *buf,unsigned int len);
 ZRESULT CloseZipU(HZIP hz);
 unsigned int FormatZipMessageU(ZRESULT code, TCHAR *buf,unsigned int len);
 bool IsZipHandleU(HZIP hz);
-#ifdef _zip_H
+#ifdef ZIP_UTILS_XZIP_H_
 #undef CloseZip
 #define CloseZip(hz) (IsZipHandleU(hz)?CloseZipU(hz):CloseZipZ(hz))
 #else
@@ -232,4 +232,4 @@ bool IsZipHandleU(HZIP hz);
 
 
 
-#endif // _unzip_H
+#endif  // ZIP_UTILS_XUNZIP_H_
