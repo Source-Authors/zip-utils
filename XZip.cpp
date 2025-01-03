@@ -2470,12 +2470,12 @@ unsigned TZip::swrite(void *param,const char *buf, unsigned size)
   if (size==0) return 0;
   TZip *zip=(TZip*)param; return zip->write(buf,size);
 }
-unsigned int TZip::write(const char *buf,unsigned int size)
-{ const char *srcbuf=buf;
+unsigned int TZip::write(const char *inbuf,unsigned int size)
+{ const char *srcbuf=inbuf;
   if (encwriting)
   { if (encbuf!=0 && encbufsize<size) {delete[] encbuf; encbuf=0;}
     if (encbuf==0) {encbuf=new char[size*2]; encbufsize=size;}
-    memcpy(encbuf,buf,size);
+    memcpy(encbuf,inbuf,size);
     for (unsigned int i=0; i<size; i++) encbuf[i]=zencode(keys,encbuf[i]);
     srcbuf=encbuf;
   }
