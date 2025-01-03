@@ -3913,7 +3913,8 @@ ZRESULT TUnzip::Open(void *z,unsigned int len,DWORD flags)
 }
 
 ZRESULT TUnzip::SetUnzipBaseDir(const TCHAR *dir)
-{ _tcsncpy(rootdir,dir,MAX_PATH-1);
+{ if (!dir) return ZR_ARGS;
+  _tcsncpy(rootdir,dir,MAX_PATH-1);
   TCHAR *lastchar = &rootdir[_tcslen(rootdir)-1];
   if (*lastchar!='\\' && *lastchar!='/') {lastchar[1]='/'; lastchar[2]=0;}
   return ZR_OK;
