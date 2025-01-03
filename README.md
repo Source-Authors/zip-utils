@@ -13,9 +13,9 @@ This source code shows how to add zip/unzip functionality to your programs. Lots
 of people have written their own wrappers around zip, and indeed there are
 several articles on codeproject that are based on earlier versions of my own
 code.  How is this version different?
-  * Clean packaging.  There's one pair of files ```zip.cpp```, ```zip.h``` to
-    add to your project if you want zip.  Another pair ```unzip.cpp```,
-    ```unzip.h``` if you want unzip (or both if you want both!).  There are NO
+  * Clean packaging.  There's one pair of files ```XZip.cpp```, ```XZip.h``` to
+    add to your project if you want zip.  Another pair ```XUnzip.cpp```,
+    ```XUnzip.h``` if you want unzip (or both if you want both!).  There are NO
     additional libraries or DLLs to worry about. 
   * Clean API.  Most other APIs around zip/unzip are terrible. This one is best.
     The API is short, clean, and in a familiar win32 style.  Most other APIs
@@ -47,11 +47,11 @@ acknowledgements.
 
 # Using the code
 
-To add zip functionality to your code, add the file zip.cpp to your project, and
-```#include "zip.h"``` to your source code.
+To add zip functionality to your code, add the file XZip.cpp to your project, and
+```#include "XZip.h"``` to your source code.
 
-Similarly for unzipping, add the file ```unzip.cpp``` to the project and
-```#include "unzip.h"``` to your source code.  Zip and unzip can co-exist
+Similarly for unzipping, add the file ```XUnzip.cpp``` to the project and
+```#include "XUnzip.h"``` to your source code.  Zip and unzip can co-exist
 happily a single application.  Or you can omit one or the other if you're trying
 to save space.
 
@@ -129,7 +129,7 @@ return ```ZR_MORE```.
 One final option: if you compile with ```"ZIP_STD"``` defined for the
 preprocessor, then ```zip``` and ```unzip``` will compile using solely stdlib --
 with no windows dependencies.  They can compile under linux with ```g++```.
-Note that some of the prototypes in ```zip.h``` and ```unzip.h``` will change
+Note that some of the prototypes in ```XZip.h``` and ```XUnzip.h``` will change
 accordingly: filetimes will be ```time_t``` structures rather than
 ```FILETIME```, and various functions will use ```FILE*``` rather than
 ```HANDLE```, and it doesn't support unicode or memory-mapping.  The example
@@ -161,7 +161,7 @@ program ```"std"``` does this.
 ```
 
 4. ```"fatal error C1010: unexpected end of file while looking for precompiled header directive"```.
-   To fix this, select ```zip.cpp``` and ```unzip.cpp``` and change
+   To fix this, select ```XZip.cpp``` and ```XUnzip.cpp``` and change
    ```Project > Settings > C++ > PrecompiledHeaders``` to
    ```NotUsingPrecompiledHeaders```.
 
@@ -247,4 +247,4 @@ www.gzip.org/zlib by Jean-Loup Gailly and Mark Adler and others.  Also from the
 ```info-zip``` source code at www.info-zip.org.  Plus a bunch of my own changes.
 The original source code can be found at those two mentioned websites.  Also the
 original copyright notices can be found there, and also inside the files
-```zip.cpp``` and ```unzip.cpp``` of my code.
+```XZip.cpp``` and ```XUnzip.cpp``` of my code.

@@ -89,6 +89,7 @@ target_sources(zip-utils
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/XZip.h>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/XUnzip.h>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/XZresult.h>
 )
 target_include_directories(zip-utils
   PUBLIC

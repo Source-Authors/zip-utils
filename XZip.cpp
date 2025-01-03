@@ -77,6 +77,7 @@ typedef unsigned short WORD;
 #define _tcsncpy strncpy
 #define _tcsstr strstr
 #define INVALID_HANDLE_VALUE 0
+#define INVALID_SET_FILE_POINTER 0xFFFFFFFFUL
 #ifndef _T
 #define _T(s) s
 #endif
@@ -96,6 +97,8 @@ typedef unsigned short WORD;
 #include <cctype>
 #include <cstdio>
 #endif
+
+#include <new>
 
 typedef unsigned char uch;   // unsigned 8-bit value
 typedef unsigned short ush;  // unsigned 16-bit value
@@ -202,10 +205,12 @@ typedef unsigned IPos;  // A Pos is an index in the character window. Pos is
 // distances are limited to MAX_DIST instead of WSIZE.
 //
 
-#define ZIP_HANDLE 1
-#define ZIP_FILENAME 2
-#define ZIP_MEMORY 3
-#define ZIP_FOLDER 4
+enum ZipMode {
+  ZIP_HANDLE = 1,
+  ZIP_FILENAME = 2,
+  ZIP_MEMORY = 3,
+  ZIP_FOLDER = 4
+};
 
 // ===========================================================================
 // Constants
@@ -398,8 +403,8 @@ typedef struct ct_data {
 
 typedef struct tree_desc {
   ct_data *dyn_tree;      // the dynamic tree
-  ct_data *static_tree;   // corresponding static tree or NULL
-  const int *extra_bits;  // extra bits for each code or NULL
+  ct_data *static_tree;   // corresponding static tree or nullptr
+  const int *extra_bits;  // extra bits for each code or nullptr
   int extra_base;         // base index for extra_bits
   int elems;              // max number of elements in the tree
   int max_length;         // max bit length for the codes
@@ -480,12 +485,14 @@ class TTreeState {
 };
 
 TTreeState::TTreeState() {
+  memset(this, 0, sizeof(*this));
+
   tree_desc a = {
       dyn_ltree, static_ltree, extra_lbits, LITERALS + 1, L_CODES, MAX_BITS, 0};
   l_desc = a;
   tree_desc b = {dyn_dtree, static_dtree, extra_dbits, 0, D_CODES, MAX_BITS, 0};
   d_desc = b;
-  tree_desc c = {bl_tree, NULL, extra_blbits, 0, BL_CODES, MAX_BL_BITS, 0};
+  tree_desc c = {bl_tree, nullptr, extra_blbits, 0, BL_CODES, MAX_BL_BITS, 0};
   bl_desc = c;
   last_lit = 0;
   last_dist = 0;
@@ -515,7 +522,11 @@ class TBitState {
 
 class TDeflateState {
  public:
-  TDeflateState() { window_size = 0; }
+  TDeflateState() {
+    memset(this, 0, sizeof(*this));
+
+    window_size = 0;
+  }
 
   uch window[2L * WSIZE];
   // Sliding window. Input bytes are read into the second half of the window,
@@ -654,14 +665,14 @@ ZRESULT GetFileInfo(FILE *hf, ulg *attr, long *size, iztimes *times,
   // It uses the upper word for standard unix attr
   a |= ((fa & 0xFFFF) << 16);
   //
-  if (attr != NULL) *attr = a;
-  if (size != NULL) *size = bhi.st_size;
-  if (times != NULL) {
+  if (attr != nullptr) *attr = a;
+  if (size != nullptr) *size = bhi.st_size;
+  if (times != nullptr) {
     times->atime = (lutime_t)bhi.st_atime;
     times->mtime = (lutime_t)bhi.st_mtime;
     times->ctime = (lutime_t)bhi.st_ctime;
   }
-  if (timestamp != NULL) {
+  if (timestamp != nullptr) {
     ush dosdate, dostime;
     filetime2dosdatetime(bhi.st_mtime, &dosdate, &dostime);
     *timestamp = (ush)dostime | (((ulg)dosdate) << 16);
@@ -733,18 +744,39 @@ ZRESULT GetFileInfo(HANDLE hf, ulg *attr, long *size, iztimes *times,
   } else
     a |= 0x00800000;  // writeable
   // now just a small heuristic to check if it's an executable:
-  DWORD red, hsize = GetFileSize(hf, NULL);
+  DWORD read, hsize = GetFileSize(hf, nullptr);
   if (hsize > 40) {
-    SetFilePointer(hf, 0, NULL, FILE_BEGIN);
-    unsigned short magic;
-    ReadFile(hf, &magic, sizeof(magic), &red, NULL);
-    SetFilePointer(hf, 36, NULL, FILE_BEGIN);
-    unsigned long hpos;
-    ReadFile(hf, &hpos, sizeof(hpos), &red, NULL);
+    DWORD pos = SetFilePointer(hf, 0, nullptr, FILE_BEGIN);
+    if (pos == INVALID_SET_FILE_POINTER) {
+      return ZR_SEEK;
+    }
+
+    unsigned short magic = 0;
+    if (!ReadFile(hf, &magic, sizeof(magic), &read, nullptr)) {
+      return ZR_READ;
+    }
+
+    pos = SetFilePointer(hf, 36, nullptr, FILE_BEGIN);
+    if (pos == INVALID_SET_FILE_POINTER) {
+      return ZR_SEEK;
+    }
+
+    unsigned long hpos = 0;
+    if (!ReadFile(hf, &hpos, sizeof(hpos), &read, nullptr)) {
+      return ZR_READ;
+    }
+
     if (magic == 0x54AD && hsize > hpos + 4 + 20 + 28) {
-      SetFilePointer(hf, hpos, NULL, FILE_BEGIN);
-      unsigned long signature;
-      ReadFile(hf, &signature, sizeof(signature), &red, NULL);
+      pos = SetFilePointer(hf, hpos, nullptr, FILE_BEGIN);
+      if (pos == INVALID_SET_FILE_POINTER) {
+        return ZR_SEEK;
+      }
+
+      unsigned long signature = 0;
+      if (!ReadFile(hf, &signature, sizeof(signature), &read, nullptr)) {
+        return ZR_READ;
+      }
+
       if (signature == IMAGE_DOS_SIGNATURE ||
           signature == IMAGE_OS2_SIGNATURE ||
           signature == IMAGE_OS2_SIGNATURE_LE ||
@@ -754,16 +786,16 @@ ZRESULT GetFileInfo(HANDLE hf, ulg *attr, long *size, iztimes *times,
     }
   }
   //
-  if (attr != NULL) *attr = a;
-  if (size != NULL) *size = hsize;
-  if (times != NULL) {  // lutime_t is 32bit number of seconds elapsed since
-                        // 0:0:0GMT, Jan1, 1970.
+  if (attr != nullptr) *attr = a;
+  if (size != nullptr) *size = hsize;
+  if (times != nullptr) {  // lutime_t is 32bit number of seconds elapsed since
+                           // 0:0:0GMT, Jan1, 1970.
     // but FILETIME is 64bit number of 100-nanosecs since Jan1, 1601
     times->atime = filetime2timet(bhi.ftLastAccessTime);
     times->mtime = filetime2timet(bhi.ftLastWriteTime);
     times->ctime = filetime2timet(bhi.ftCreationTime);
   }
-  if (timestamp != NULL) {
+  if (timestamp != nullptr) {
     WORD dosdate, dostime;
     filetime2dosdatetime(bhi.ftLastWriteTime, &dosdate, &dostime);
     *timestamp = (WORD)dostime | (((DWORD)dosdate) << 16);
@@ -1402,18 +1434,18 @@ ulg flush_block(TState &state, char *buf, ulg stored_len, int eof) {
   // possibility since the code's cleaner if no changes are allowed.
   // if (stored_len <= opt_lenb && eof && state.ts.cmpr_bytelen == 0L
   //   && state.ts.cmpr_len_bits == 0L && state.seekable)
-  //{   // && state.ts.file_method != NULL
+  //{   // && state.ts.file_method != nullptr
   //    // Since LIT_BUFSIZE <= 2*WSIZE, the input data must be there:
-  //    Assert(state,buf!=NULL,"block vanished");
+  //    Assert(state,buf!=nullptr,"block vanished");
   //    copy_block(state,buf, (unsigned)stored_len, 0); // without header
   //    state.ts.cmpr_bytelen = stored_len;
   //    Assert(state,false,"unimplemented *state.ts.file_method = STORE;");
   //    //*state.ts.file_method = STORE;
   //}
   // else
-  if (stored_len + 4 <= opt_lenb && buf != (char *)NULL) {
+  if (stored_len + 4 <= opt_lenb && buf != (char *)nullptr) {
     /* 4: two words for the lengths */
-    /* The test buf != NULL is only necessary if LIT_BUFSIZE > WSIZE.
+    /* The test buf != nullptr is only necessary if LIT_BUFSIZE > WSIZE.
      * Otherwise we can't have processed more than WSIZE input bytes since
      * the last block flush, because compression would have been
      * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
@@ -1961,7 +1993,7 @@ void fill_window(TState &state) {
   flush_block(state,                                                         \
               state.ds.block_start >= 0L                                     \
                   ? (char *)&state.ds.window[(unsigned)state.ds.block_start] \
-                  : (char *)NULL,                                            \
+                  : (char *)nullptr,                                         \
               (long)state.ds.strstart - state.ds.block_start, (eof))
 
 /* ===========================================================================
@@ -2307,7 +2339,7 @@ constexpr ulg crc_table[256] = {
   DO4(buf)
 
 ulg crc32(ulg crc, const uch *buf, extent len) {
-  if (buf == NULL) return 0L;
+  if (buf == nullptr) return 0L;
   crc = crc ^ 0xffffffffL;
   while (len >= 8) {
     DO8(buf);
@@ -2377,9 +2409,15 @@ class TZip {
         encbuf(0),
         password(0),
         state(0) {
+    memset(this, 0, sizeof(*this));
+
     if (pwd != 0 && *pwd != 0) {
-      password = new char[strlen(pwd) + 1];
-      strcpy(password, pwd);
+      password = new (std::nothrow) char[strlen(pwd) + 1];
+      if (password) {
+        strcpy(password, pwd);
+      } else {
+        oerr = ZR_NOALLOC;
+      }
     }
   }
   ~TZip() {
@@ -2461,12 +2499,12 @@ class TZip {
 };
 
 ZRESULT TZip::Create(void *z, unsigned int len, DWORD flags) {
-  if (hfout != 0 || hmapout != 0 || obuf != 0 || writ != 0 || oerr != ZR_OK ||
-      hasputcen)
+  if (hfout != nullptr || hmapout != nullptr || obuf != nullptr || writ != 0 ||
+      oerr != ZR_OK || hasputcen)
     return ZR_NOTINITED;
   //
   if (flags == ZIP_HANDLE) {
-    HANDLE hf = (HANDLE)z;
+    HANDLE hf = static_cast<HANDLE>(z);
     hfout = hf;
     mustclosehfout = false;
 #ifdef DuplicateHandle
@@ -2478,7 +2516,7 @@ ZRESULT TZip::Create(void *z, unsigned int len, DWORD flags) {
     // ourselves (while the caller closes h themselves), or we couldn't
     // duplicate it.
     DWORD res = GetFilePosZ(hfout);
-    ocanseek = (res != 0xFFFFFFFF);
+    ocanseek = (res != INVALID_SET_FILE_POINTER);
     ooffset = ocanseek ? res : 0;
     return ZR_OK;
   } else if (flags == ZIP_FILENAME) {
@@ -2487,8 +2525,10 @@ ZRESULT TZip::Create(void *z, unsigned int len, DWORD flags) {
     hfout = fopen(fn, "wb");
     if (hfout == 0) return ZR_NOFILE;
 #else
-    hfout = CreateFile(fn, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                       FILE_ATTRIBUTE_NORMAL, NULL);
+    hfout = CreateFile(fn, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS |
+                           FILE_FLAG_WRITE_THROUGH,
+                       nullptr);
     if (hfout == INVALID_HANDLE_VALUE) {
       hfout = 0;
       return ZR_NOFILE;
@@ -2510,9 +2550,9 @@ ZRESULT TZip::Create(void *z, unsigned int len, DWORD flags) {
     if (z != 0)
       obuf = (char *)z;
     else {
-      hmapout = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
-                                  size, NULL);
-      if (hmapout == NULL) return ZR_NOALLOC;
+      hmapout = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+                                  0, size, nullptr);
+      if (hmapout == nullptr) return ZR_NOALLOC;
       obuf = (char *)MapViewOfFile(hmapout, FILE_MAP_ALL_ACCESS, 0, 0, size);
       if (obuf == 0) {
         CloseHandle(hmapout);
@@ -2543,37 +2583,53 @@ unsigned TZip::swrite(void *param, const char *buf, unsigned size) {  // static
 }
 unsigned int TZip::write(const char *inbuf, unsigned int size) {
   const char *srcbuf = inbuf;
+
   if (encwriting) {
     if (encbuf != 0 && encbufsize < size) {
       delete[] encbuf;
       encbuf = 0;
     }
+
     if (encbuf == 0) {
-      encbuf = new char[size * 2];
+      encbuf = new (std::nothrow) char[size * 2];
+      if (!encbuf) {
+        oerr = ZR_NOALLOC;
+        return 0;
+      }
       encbufsize = size;
     }
+
     memcpy(encbuf, inbuf, size);
+
     for (unsigned int i = 0; i < size; i++)
       encbuf[i] = zencode(keys, encbuf[i]);
+
     srcbuf = encbuf;
   }
+
   if (obuf != 0) {
     if (opos + size >= mapsize) {
       oerr = ZR_MEMSIZE;
       return 0;
     }
+
     memcpy(obuf + opos, srcbuf, size);
     opos += size;
     return size;
-  } else if (hfout != 0) {
+  }
+
+  if (hfout != 0) {
 #ifdef ZIP_STD
     DWORD bytes = (DWORD)fwrite(srcbuf, 1, size, hfout);
 #else
-    DWORD bytes;
-    WriteFile(hfout, srcbuf, size, &bytes, NULL);
+    DWORD bytes = 0;
+    if (!WriteFile(hfout, srcbuf, size, &bytes, nullptr)) {
+      oerr = ZR_WRITE;
+    }
 #endif
     return bytes;
   }
+
   oerr = ZR_NOTINITED;
   return 0;
 }
@@ -2583,23 +2639,30 @@ bool TZip::oseek(unsigned int pos) {
     oerr = ZR_SEEK;
     return false;
   }
-  if (obuf != 0) {
+
+  if (obuf != nullptr) {
     if (pos >= mapsize) {
       oerr = ZR_MEMSIZE;
       return false;
     }
+
     opos = pos;
     return true;
-  } else if (hfout != 0) {
+  }
+
+  if (hfout != nullptr) {
 #ifdef ZIP_STD
     fseek(hfout, pos + ooffset, SEEK_SET);
-#else
-    SetFilePointer(hfout, pos + ooffset, NULL, FILE_BEGIN);
-#endif
     return true;
+#else
+    const DWORD res = SetFilePointer(hfout, pos + ooffset, nullptr, FILE_BEGIN);
+    oerr = res != INVALID_SET_FILE_POINTER ? ZR_OK : ZR_SEEK;
+    return oerr == ZR_OK;
+#endif
   }
+
   oerr = ZR_NOTINITED;
-  return 0;
+  return false;
 }
 
 // When the user calls GetMemory, they're presumably at the end of all their
@@ -2608,9 +2671,9 @@ bool TZip::oseek(unsigned int pos) {
 ZRESULT TZip::GetMemory(void **pbuf, unsigned long *plen) {
   if (!hasputcen) AddCentral();
   hasputcen = true;
-  if (pbuf != NULL) *pbuf = obuf;
-  if (plen != NULL) *plen = writ;
-  if (obuf == NULL) return ZR_NOTMMAP;
+  if (pbuf != nullptr) *pbuf = obuf;
+  if (plen != nullptr) *plen = writ;
+  if (obuf == nullptr) return ZR_NOTMMAP;
   return ZR_OK;
 }
 
@@ -2654,8 +2717,9 @@ ZRESULT TZip::open_file(const TCHAR *fn) {
     return res;
   }
 #else
-  HANDLE hf = CreateFile(fn, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                         0, NULL);
+  HANDLE hf = CreateFile(
+      fn, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+      FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
   if (hf == INVALID_HANDLE_VALUE) return ZR_NOFILE;
   ZRESULT res = open_handle(hf, 0);
   if (res != ZR_OK) {
@@ -2674,41 +2738,53 @@ ZRESULT TZip::open_handle(HANDLE hf, unsigned int len) {
   isize = 0;
   csize = 0;
   ired = 0;
+
   if (hf == 0 || hf == INVALID_HANDLE_VALUE) return ZR_ARGS;
+
   bool canseek;
 #ifdef ZIP_STD
   struct stat st;
   fstat(fileno(hf), &st);
   canseek = S_ISREG(st.st_mode);
 #else
-  DWORD res = SetFilePointer(hfout, 0, 0, FILE_CURRENT);
-  canseek = (res != 0xFFFFFFFF);
+  DWORD pos = SetFilePointer(hfout, 0, 0, FILE_CURRENT);
+  canseek = (pos != INVALID_SET_FILE_POINTER);
 #endif
+
   if (canseek) {
     ZRESULT rc = GetFileInfo(hf, &attr, &isize, &times, &timestamp);
     if (rc != ZR_OK) return rc;
+
 #ifdef ZIP_STD
     fseek(hf, 0, SEEK_SET);
-#else
-    SetFilePointer(hf, 0, NULL,
-                   FILE_BEGIN);  // because GetFileInfo will have screwed it up
-#endif
     iseekable = true;
+#else
+    // because GetFileInfo will have screwed it up
+    const DWORD res = SetFilePointer(hf, 0, nullptr, FILE_BEGIN);
+    rc = res != INVALID_SET_FILE_POINTER ? ZR_OK : ZR_SEEK;
+    iseekable = rc == ZR_OK;
+#endif
+
     hfin = hf;
-    return ZR_OK;
-  } else {
-    attr = 0x80000000;          // just a normal file
-    isize = -1;                 // can't know size until at the end
-    if (len != 0) isize = len;  // unless we were told explicitly!
-    iseekable = false;
-    WORD dosdate, dostime;
-    GetNow(&times.atime, &dosdate, &dostime);
-    times.mtime = times.atime;
-    times.ctime = times.atime;
-    timestamp = (WORD)dostime | (((DWORD)dosdate) << 16);
-    hfin = hf;
-    return ZR_OK;
+    return rc;
   }
+
+  attr = 0x80000000;  // just a normal file
+  isize = -1;         // can't know size until at the end
+
+  if (len != 0) isize = len;  // unless we were told explicitly!
+
+  iseekable = false;
+
+  WORD dosdate, dostime;
+  GetNow(&times.atime, &dosdate, &dostime);
+
+  times.mtime = times.atime;
+  times.ctime = times.atime;
+  timestamp = (WORD)dostime | (((DWORD)dosdate) << 16);
+  hfin = hf;
+
+  return ZR_OK;
 }
 ZRESULT TZip::open_mem(void *src, unsigned int len) {
   hfin = 0;
@@ -2758,29 +2834,38 @@ unsigned TZip::sread(TState &s, char *buf, unsigned size) {  // static
 unsigned TZip::read(char *inbuf, unsigned size) {
   if (bufin != 0) {
     if (posin >= lenin) return 0;  // end of input
+
     ulg red = lenin - posin;
     if (red > size) red = size;
+
     memcpy(inbuf, bufin + posin, red);
+
     posin += red;
     ired += red;
     crc = crc32(crc, (uch *)inbuf, red);
+
     return red;
-  } else if (hfin != 0) {
+  }
+
+  if (hfin != nullptr) {
     DWORD red;
 #ifdef ZIP_STD
     red = (DWORD)fread(inbuf, 1, size, hfin);
     if (red == 0) return 0;
 #else
-    BOOL ok = ReadFile(hfin, inbuf, size, &red, NULL);
-    if (!ok) return 0;
+    BOOL ok = ReadFile(hfin, inbuf, size, &red, nullptr);
+    if (!ok) {
+      oerr = ZR_READ;
+      return 0;
+    }
 #endif
     ired += red;
     crc = crc32(crc, (uch *)inbuf, red);
     return red;
-  } else {
-    oerr = ZR_NOTINITED;
-    return 0;
   }
+
+  oerr = ZR_NOTINITED;
+  return 0;
 }
 
 ZRESULT TZip::iclose() {
@@ -2800,7 +2885,9 @@ ZRESULT TZip::iclose() {
 }
 
 ZRESULT TZip::ideflate(TZipFileInfo *zfi) {
-  if (state == 0) state = new TState();
+  if (state == nullptr) state = new (std::nothrow) TState();
+  if (!state) return ZR_NOALLOC;
+
   // It's a very big object! 500k! We allocate it on the heap, because
   // PocketPC's stack breaks if we try to put it all on the stack. It will be
   // deleted lazily
@@ -2810,21 +2897,21 @@ ZRESULT TZip::ideflate(TZipFileInfo *zfi) {
   state->param = this;
   state->level = 8;
   state->seekable = iseekable;
-  state->err = NULL;
+  state->err = nullptr;
   // the following line will make ct_init realise it has to perform the init
   state->ts.static_dtree[0].dl.len = 0;
   // Thanks to Alvin77 for this crucial fix:
   state->ds.window_size = 0;
   //  I think that covers everything that needs to be initted.
   //
-  bi_init(*state, buf, sizeof(buf),
-          1);  // it used to be just 1024-size, not 16384 as here
+  // it used to be just 1024-size, not 16384 as here
+  bi_init(*state, buf, sizeof(buf), 1);
   ct_init(*state, &zfi->att);
   lm_init(*state, state->level, &zfi->flg);
   ulg sz = deflate(*state);
   csize = sz;
   ZRESULT r = ZR_OK;
-  if (state->err != NULL) r = ZR_FLATE;
+  if (state->err != nullptr) r = ZR_FLATE;
   return r;
 }
 
@@ -2888,7 +2975,7 @@ ZRESULT TZip::Add(const TCHAR *odstzn, void *src, unsigned int len,
 
   // Initialize the local header
   TZipFileInfo zfi;
-  zfi.nxt = NULL;
+  zfi.nxt = nullptr;
   strcpy(zfi.name, "");
 #ifdef UNICODE
   WideCharToMultiByte(CP_UTF8, 0, dstzn, -1, zfi.iname, MAX_PATH, 0, 0);
@@ -2902,12 +2989,12 @@ ZRESULT TZip::Add(const TCHAR *odstzn, void *src, unsigned int len,
     zfi.nam++;
   }
   strcpy(zfi.zname, "");
-  zfi.extra = NULL;
+  zfi.extra = nullptr;
   zfi.ext = 0;  // extra header to go after this compressed data, and its length
-  zfi.cextra = NULL;
+  zfi.cextra = nullptr;
   zfi.cext = 0;  // extra header to go in the central end-of-zip directory, and
                  // its length
-  zfi.comment = NULL;
+  zfi.comment = nullptr;
   zfi.com = 0;  // comment, and its length
   zfi.mark = 1;
   zfi.dosflag = 0;
@@ -2987,16 +3074,27 @@ ZRESULT TZip::Add(const TCHAR *odstzn, void *src, unsigned int len,
     srand((unsigned)(GetTickCount64() ^ (ULONGLONG)GetDesktopWindow()));
 #endif
   char vencbuf[12];
-  for (int i = 0; i < 12; i++) vencbuf[i] = (char)((rand() >> 7) & 0xff);
+  for (char &c : vencbuf) c = (char)((rand() >> 7) & 0xff);
+
   vencbuf[11] = (char)((zfi.tim >> 8) & 0xff);
+
   for (int ei = 0; ei < 12; ei++) vencbuf[ei] = zencode(keys, vencbuf[ei]);
+
+  ZRESULT writeres = ZR_OK;
   if (password != 0 && !isdir) {
-    swrite(this, vencbuf, 12);
-    writ += 12;
+    unsigned written = swrite(this, vencbuf, ARRAYSIZE(vencbuf));
+    if (written != ARRAYSIZE(vencbuf)) {
+      writeres = ZR_WRITE;
+    }
+    writ += written;
+  }
+
+  if (writeres != ZR_OK) {
+    iclose();
+    return writeres;
   }
 
   //(2) Write deflated/stored file to zip file
-  ZRESULT writeres = ZR_OK;
   encwriting = (password != 0 && !isdir);  // an object member variable to say
                                            // whether we write to disk encrypted
   if (!isdir && method == DEFLATE)
@@ -3035,16 +3133,23 @@ ZRESULT TZip::Add(const TCHAR *odstzn, void *src, unsigned int len,
   if (oerr != ZR_OK) return oerr;
 
   // Keep a copy of the zipfileinfo, for our end-of-zip directory
-  char *cextra = new char[zfi.cext];
+  char *cextra = new (std::nothrow) char[zfi.cext];
+  if (!cextra) {
+    oerr = ZR_NOALLOC;
+    return oerr;
+  }
+
   memcpy(cextra, zfi.cextra, zfi.cext);
   zfi.cextra = cextra;
-  TZipFileInfo *pzfi = new TZipFileInfo;
+  TZipFileInfo *pzfi = new (std::nothrow) TZipFileInfo;
+  if (!pzfi) return ZR_NOALLOC;
+
   memcpy(pzfi, &zfi, sizeof(zfi));
-  if (zfis == NULL)
+  if (zfis == nullptr)
     zfis = pzfi;
   else {
     TZipFileInfo *z = zfis;
-    while (z->nxt != NULL) z = z->nxt;
+    while (z->nxt != nullptr) z = z->nxt;
     z->nxt = pzfi;
   }
   return ZR_OK;
@@ -3055,7 +3160,7 @@ ZRESULT TZip::AddCentral() {  // write central directory
   ulg pos_at_start_of_central = writ;
   // ulg tot_unc_size=0, tot_compressed_size=0;
   bool okay = true;
-  for (TZipFileInfo *zfi = zfis; zfi != NULL;) {
+  for (TZipFileInfo *zfi = zfis; zfi != nullptr;) {
     if (okay) {
       int res = putcentral(zfi, swrite, this);
       if (res != ZE_OK) okay = false;
@@ -3074,7 +3179,7 @@ ZRESULT TZip::AddCentral() {  // write central directory
   ulg center_size = writ - pos_at_start_of_central;
   if (okay) {
     int res = putend(numentries, center_size, pos_at_start_of_central + ooffset,
-                     0, NULL, swrite, this);
+                     0, nullptr, swrite, this);
     if (res != ZE_OK) okay = false;
     writ += 4 + ENDHEAD + 0;
   }
@@ -3092,16 +3197,30 @@ thread_local ZRESULT lasterrorZ = ZR_OK;
 
 HZIP CreateZipInternal(void *z, unsigned int len, DWORD flags,
                        const char *password) {
-  auto *zip = new TZip(password);
+  auto *zip = new (std::nothrow) TZip(password);
+  if (!zip) return nullptr;
 
-  ZRESULT rc = zip->Create(z, len, flags);
+  ZRESULT rc = zip->oerr;
   if (rc != ZR_OK) {
     delete zip;
     lasterrorZ = rc;
     return nullptr;
   }
 
-  auto *han = new TZipHandleData;
+  rc = zip->Create(z, len, flags);
+  if (rc != ZR_OK) {
+    delete zip;
+    lasterrorZ = rc;
+    return nullptr;
+  }
+
+  auto *han = new (std::nothrow) TZipHandleData;
+  if (!han) {
+    delete zip;
+    lasterrorZ = ZR_NOALLOC;
+    return nullptr;
+  }
+
   han->flag = 2;
   han->zip = zip;
 
@@ -3130,7 +3249,7 @@ ZRESULT ZipAddInternal(HZIP hz, const TCHAR *dstzn, void *src, unsigned int len,
 
 }  // namespace
 
-unsigned int FormatZipMessageZ(ZRESULT code, char *buf, unsigned int len) {
+size_t FormatZipMessageZ(ZRESULT code, char *buf, size_t len) {
   if (code == ZR_RECENT) code = lasterrorZ;
 
   const char *msg = "unknown zip result code";
@@ -3161,6 +3280,18 @@ unsigned int FormatZipMessageZ(ZRESULT code, char *buf, unsigned int len) {
       break;
     case ZR_READ:
       msg = "Error reading file";
+      break;
+    case ZR_PASSWORD:
+      msg = "Correct password required";
+      break;
+    case ZR_CWD:
+      msg = "Error getting current directory";
+      break;
+    case ZR_MKDIR:
+      msg = "Error creating directory";
+      break;
+    case ZR_SETFTIME:
+      msg = "Error setting file times";
       break;
     case ZR_ARGS:
       msg = "Caller: faulty arguments";
@@ -3200,10 +3331,10 @@ unsigned int FormatZipMessageZ(ZRESULT code, char *buf, unsigned int len) {
       break;
   }
 
-  unsigned int mlen = (unsigned int)strlen(msg);
+  size_t mlen = strlen(msg);
   if (buf == nullptr || len == 0) return mlen;
 
-  unsigned int n = mlen;
+  size_t n = mlen;
   if (n + 1 > len) n = len - 1;
 
   strncpy(buf, msg, n);
