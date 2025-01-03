@@ -66,11 +66,8 @@
 
 #ifdef ZIP_STD
 #include <time.h>
-#define DECLARE_HANDLE(name) \
-  struct name##__ {          \
-    int unused;              \
-  };                         \
-  typedef struct name##__ *name
+// An HZIP identifies a zip file that is being created.
+using HZIP = struct HZIP__ *;
 #ifndef MAX_PATH
 #define MAX_PATH 1024
 #endif
