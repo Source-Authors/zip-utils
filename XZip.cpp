@@ -1,43 +1,3 @@
-#ifdef ZIP_STD
-#include "XZip.h"
-
-#include <memory.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-
-#include <cctype>
-#include <cstdarg>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
-//
-typedef unsigned short WORD;
-#define _tcslen strlen
-#define _tcsicmp stricmp
-#define _tcsncpy strncpy
-#define _tcsstr strstr
-#define INVALID_HANDLE_VALUE 0
-#ifndef _T
-#define _T(s) s
-#endif
-#ifndef S_IWUSR
-#define S_IWUSR 0000200
-#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
-#define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
-#endif
-
-//
-#else
-#include <tchar.h>
-#include <windows.h>
-
-#include <cctype>
-#include <cstdio>
-
-#include "XZip.h"
-#endif
-
 // THIS FILE is almost entirely based upon code by info-zip.
 // It has been modified by Lucian Wischik. The modifications
 // were a complete rewrite of the bit of code that generates the
@@ -96,7 +56,46 @@ typedef unsigned short WORD;
 //    4. Info-ZIP retains the right to use the names "Info-ZIP," "Zip," "UnZip,"
 //       "WiZ," "Pocket UnZip," "Pocket Zip," and "MacZip" for its own source
 //       and binary releases.
+
+#ifdef ZIP_STD
+#include "XZip.h"
 //
+#include <memory.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <cctype>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+//
+typedef unsigned short WORD;
+#define _tcslen strlen
+#define _tcsicmp stricmp
+#define _tcsncpy strncpy
+#define _tcsstr strstr
+#define INVALID_HANDLE_VALUE 0
+#ifndef _T
+#define _T(s) s
+#endif
+#ifndef S_IWUSR
+#define S_IWUSR 0000200
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+#endif
+
+//
+#else
+#include "XZip.h"
+//
+#include <tchar.h>
+#include <windows.h>
+
+#include <cctype>
+#include <cstdio>
+#endif
 
 typedef unsigned char uch;   // unsigned 8-bit value
 typedef unsigned short ush;  // unsigned 16-bit value
@@ -2361,7 +2360,7 @@ bool HasZipSuffix(const TCHAR *fn) {
 
 class TZip {
  public:
-  TZip(const char *pwd)
+  explicit TZip(const char *pwd)
       : hfout(0),
         mustclosehfout(false),
         hmapout(0),
@@ -2382,11 +2381,11 @@ class TZip {
     }
   }
   ~TZip() {
-    if (state != 0) delete state;
+    delete state;
     state = 0;
-    if (encbuf != 0) delete[] encbuf;
+    delete[] encbuf;
     encbuf = 0;
-    if (password != 0) delete[] password;
+    delete[] password;
     password = 0;
   }
 
@@ -2845,6 +2844,8 @@ ZRESULT TZip::istore() {
 bool has_seeded = false;
 ZRESULT TZip::Add(const TCHAR *odstzn, void *src, unsigned int len,
                   DWORD flags) {
+  if (odstzn == nullptr) return ZR_ARGS;
+  if (src == nullptr || len == 0) return ZR_ARGS;
   if (oerr) return ZR_FAILED;
   if (hasputcen) return ZR_ENDED;
 
@@ -3081,11 +3082,12 @@ ZRESULT TZip::AddCentral() {  // write central directory
   if (!okay) return ZR_WRITE;
   return ZR_OK;
 }
-
-ZRESULT lasterrorZ = ZR_OK;
+// dimhotepus: Add thread_local.
+static thread_local ZRESULT lasterrorZ = ZR_OK;
 
 unsigned int FormatZipMessageZ(ZRESULT code, char *buf, unsigned int len) {
   if (code == ZR_RECENT) code = lasterrorZ;
+
   const char *msg = "unknown zip result code";
   switch (code) {
     case ZR_OK:
@@ -3152,32 +3154,40 @@ unsigned int FormatZipMessageZ(ZRESULT code, char *buf, unsigned int len) {
       msg = "Zip-bug: an internal error during flation";
       break;
   }
+
   unsigned int mlen = (unsigned int)strlen(msg);
-  if (buf == 0 || len == 0) return mlen;
+  if (buf == nullptr || len == 0) return mlen;
+
   unsigned int n = mlen;
   if (n + 1 > len) n = len - 1;
+
   strncpy(buf, msg, n);
-  buf[n] = 0;
+  buf[n] = '\0';
+
   return mlen;
 }
 
-typedef struct {
+struct TZipHandleData {
   DWORD flag;
   TZip *zip;
-} TZipHandleData;
+};
 
-HZIP CreateZipInternal(void *z, unsigned int len, DWORD flags,
-                       const char *password) {
-  TZip *zip = new TZip(password);
-  lasterrorZ = zip->Create(z, len, flags);
-  if (lasterrorZ != ZR_OK) {
+static HZIP CreateZipInternal(void *z, unsigned int len, DWORD flags,
+                              const char *password) {
+  auto *zip = new TZip(password);
+
+  ZRESULT rc = zip->Create(z, len, flags);
+  if (rc != ZR_OK) {
     delete zip;
-    return 0;
+    lasterrorZ = rc;
+    return nullptr;
   }
-  TZipHandleData *han = new TZipHandleData;
+
+  auto *han = new TZipHandleData;
   han->flag = 2;
   han->zip = zip;
-  return (HZIP)han;
+
+  return reinterpret_cast<HZIP>(han);
 }
 HZIP CreateZipHandle(HANDLE h, const char *password) {
   return CreateZipInternal(h, 0, ZIP_HANDLE, password);
@@ -3189,20 +3199,24 @@ HZIP CreateZip(void *z, unsigned int len, const char *password) {
   return CreateZipInternal(z, len, ZIP_MEMORY, password);
 }
 
-ZRESULT ZipAddInternal(HZIP hz, const TCHAR *dstzn, void *src, unsigned int len,
-                       DWORD flags) {
-  if (hz == 0) {
+static ZRESULT ZipAddInternal(HZIP hz, const TCHAR *dstzn, void *src,
+                              unsigned int len, DWORD flags) {
+  if (hz == nullptr) {
     lasterrorZ = ZR_ARGS;
     return ZR_ARGS;
   }
-  TZipHandleData *han = (TZipHandleData *)hz;
+
+  auto *han = reinterpret_cast<TZipHandleData *>(hz);
   if (han->flag != 2) {
     lasterrorZ = ZR_ZMODE;
     return ZR_ZMODE;
   }
+
   TZip *zip = han->zip;
-  lasterrorZ = zip->Add(dstzn, src, len, flags);
-  return lasterrorZ;
+  ZRESULT rc = zip->Add(dstzn, src, len, flags);
+
+  lasterrorZ = rc;
+  return rc;
 }
 ZRESULT ZipAdd(HZIP hz, const TCHAR *dstzn, const TCHAR *fn) {
   return ZipAddInternal(hz, dstzn, (void *)fn, 0, ZIP_FILENAME);
@@ -3221,43 +3235,56 @@ ZRESULT ZipAddFolder(HZIP hz, const TCHAR *dstzn) {
 }
 
 ZRESULT ZipGetMemory(HZIP hz, void **buf, unsigned long *len) {
-  if (hz == 0) {
-    if (buf != 0) *buf = 0;
-    if (len != 0) *len = 0;
+  if (hz == nullptr) {
+    if (buf != nullptr) *buf = nullptr;
+    if (len != nullptr) *len = 0;
+
     lasterrorZ = ZR_ARGS;
     return ZR_ARGS;
   }
-  TZipHandleData *han = (TZipHandleData *)hz;
+
+  auto *han = reinterpret_cast<TZipHandleData *>(hz);
   if (han->flag != 2) {
-    if (buf != 0) *buf = 0;
-    if (len != 0) *len = 0;
+    if (buf != nullptr) *buf = nullptr;
+    if (len != nullptr) *len = 0;
+
     lasterrorZ = ZR_ZMODE;
     return ZR_ZMODE;
   }
+
   TZip *zip = han->zip;
-  lasterrorZ = zip->GetMemory(buf, len);
-  return lasterrorZ;
+  ZRESULT rc = zip->GetMemory(buf, len);
+
+  lasterrorZ = rc;
+  return rc;
 }
 
 ZRESULT CloseZipZ(HZIP hz) {
-  if (hz == 0) {
+  if (hz == nullptr) {
     lasterrorZ = ZR_ARGS;
     return ZR_ARGS;
   }
-  TZipHandleData *han = (TZipHandleData *)hz;
+
+  auto *han = reinterpret_cast<TZipHandleData *>(hz);
   if (han->flag != 2) {
     lasterrorZ = ZR_ZMODE;
     return ZR_ZMODE;
   }
+
   TZip *zip = han->zip;
-  lasterrorZ = zip->Close();
+  ZRESULT rc = zip->Close();
+
   delete zip;
   delete han;
-  return lasterrorZ;
+
+  lasterrorZ = rc;
+  return rc;
 }
 
 bool IsZipHandleZ(HZIP hz) {
-  if (hz == 0) return false;
-  TZipHandleData *han = (TZipHandleData *)hz;
+  if (hz == nullptr) return false;
+
+  const auto *han = reinterpret_cast<TZipHandleData *>(hz);
+
   return (han->flag == 2);
 }

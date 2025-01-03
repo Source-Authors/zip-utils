@@ -1,58 +1,3 @@
-#ifdef ZIP_STD
-#include <malloc.h>
-
-#include <cstdio>
-#include <cstring>
-#include <ctime>
-#ifdef _MSC_VER
-#include <sys/utime.h>  // microsoft puts it here
-#else
-#include <utime.h>
-#endif
-#if defined(_MSC_VER) || defined(__BORLANDC__) || defined(__MINGW32__)
-#include <direct.h>
-#define lumkdir(t) (mkdir(t))
-#else
-#include <unistd.h>
-#define lumkdir(t) (mkdir(t, 0755))
-#endif
-#include <sys/stat.h>
-#include <sys/types.h>
-
-#include "XUnzip.h"
-//
-typedef unsigned short WORD;
-#define _tcslen strlen
-#define _tcsicmp stricmp
-#define _tcsncpy strncpy
-#define _tcsstr strstr
-#define INVALID_HANDLE_VALUE 0
-#ifndef _T
-#define _T(s) s
-#endif
-#ifndef S_IWUSR
-#define S_IWUSR 0000200
-#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
-#define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
-#endif
-//
-#else
-#include <tchar.h>
-#include <windows.h>
-
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-
-#include "XUnzip.h"
-#endif
-//
-#ifdef UNICODE
-#define _tsprintf swprintf
-#else
-#define _tsprintf sprintf
-#endif
-
 // THIS FILE is almost entirely based upon code by Jean-loup Gailly
 // and Mark Adler. It has been modified by Lucian Wischik.
 // The modifications were: incorporate the bugfixes of 1.1.4, allow
@@ -116,6 +61,61 @@ typedef unsigned short WORD;
 // ftp://ftp.cdrom.com/pub/infozip/doc/appnote-970311-iz.zip
 //   PkWare has also a specification at ftp://ftp.pkware.com/probdesc.zip
 
+#ifdef ZIP_STD
+#include "XUnzip.h"
+//
+#include <malloc.h>
+
+#include <cstdio>
+#include <cstring>
+#include <ctime>
+#ifdef _MSC_VER
+#include <sys/utime.h>  // microsoft puts it here
+#else
+#include <utime.h>
+#endif
+#if defined(_MSC_VER) || defined(__BORLANDC__) || defined(__MINGW32__)
+#include <direct.h>
+#define lumkdir(t) (mkdir(t))
+#else
+#include <unistd.h>
+#define lumkdir(t) (mkdir(t, 0755))
+#endif
+#include <sys/stat.h>
+#include <sys/types.h>
+//
+typedef unsigned short WORD;
+#define _tcslen strlen
+#define _tcsicmp stricmp
+#define _tcsncpy strncpy
+#define _tcsstr strstr
+#define INVALID_HANDLE_VALUE 0
+#ifndef _T
+#define _T(s) s
+#endif
+#ifndef S_IWUSR
+#define S_IWUSR 0000200
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+#endif
+//
+#else
+#include "XUnzip.h"
+//
+#include <tchar.h>
+#include <windows.h>
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#endif
+//
+#ifdef UNICODE
+#define _tsprintf swprintf
+#else
+#define _tsprintf sprintf
+#endif
+
 #define ZIP_HANDLE 1
 #define ZIP_FILENAME 2
 #define ZIP_MEMORY 3
@@ -124,39 +124,8 @@ typedef unsigned short WORD;
 
 #define zfree(p) free(p)
 
-typedef unsigned long
-    lutime_t;  // define it ourselves since we don't include time.h
-
-/*
-void *zmalloc(unsigned int len)
-{ char *buf = new char[len+32];
-  for (int i=0; i<16; i++)
-  { buf[i]=i;
-    buf[len+31-i]=i;
-  }
-  *((unsigned int*)buf) = len;
-  char c[1000]; wsprintf(c,"malloc 0x%lx  - %lu",buf+16,len);
-  OutputDebugString(c);
-  return buf+16;
-}
-
-void zfree(void *buf)
-{ char c[1000]; wsprintf(c,"free   0x%lx",buf);
-  OutputDebugString(c);
-  char *p = ((char*)buf)-16;
-  unsigned int len = *((unsigned int*)p);
-  bool blown=false;
-  for (int i=0; i<16; i++)
-  { char lo = p[i];
-    char hi = p[len+31-i];
-    if (hi!=i || (lo!=i && i>4)) blown=true;
-  }
-  if (blown)
-  { OutputDebugString("BLOWN!!!");
-  }
-  delete[] p;
-}
-*/
+// define it ourselves since we don't include time.h
+typedef unsigned long lutime_t;
 
 typedef struct tm_unz_s {
   unsigned int tm_sec;   // seconds after the minute - [0,59]
@@ -4187,16 +4156,20 @@ ZRESULT TUnzip::Unzip(int index, void *dst, unsigned int len, DWORD flags) {
 
 ZRESULT TUnzip::Close() {
   if (currentfile != -1) unzCloseCurrentFile(uf);
+
   currentfile = -1;
+
   if (uf != 0) unzClose(uf);
+
   uf = 0;
   return ZR_OK;
 }
-
-ZRESULT lasterrorU = ZR_OK;
+// dimhotepus: Add thread_local.
+static thread_local ZRESULT lasterrorU = ZR_OK;
 
 unsigned int FormatZipMessageU(ZRESULT code, TCHAR *buf, unsigned int len) {
   if (code == ZR_RECENT) code = lasterrorU;
+
   const TCHAR *msg = _T("unknown zip result code");
   switch (code) {
     case ZR_OK:
@@ -4266,32 +4239,40 @@ unsigned int FormatZipMessageU(ZRESULT code, TCHAR *buf, unsigned int len) {
       msg = _T("Zip-bug: an internal error during flation");
       break;
   }
+
   unsigned int mlen = (unsigned int)_tcslen(msg);
   if (buf == 0 || len == 0) return mlen;
+
   unsigned int n = mlen;
   if (n + 1 > len) n = len - 1;
+
   _tcsncpy(buf, msg, n);
   buf[n] = 0;
+
   return mlen;
 }
 
-typedef struct {
+struct TUnzipHandleData {
   DWORD flag;
   TUnzip *unz;
-} TUnzipHandleData;
+};
 
-HZIP OpenZipInternal(void *z, unsigned int len, DWORD flags,
-                     const char *password) {
-  TUnzip *unz = new TUnzip(password);
-  lasterrorU = unz->Open(z, len, flags);
-  if (lasterrorU != ZR_OK) {
+static HZIP OpenZipInternal(void *z, unsigned int len, DWORD flags,
+                            const char *password) {
+  auto *unz = new TUnzip(password);
+
+  ZRESULT rc = unz->Open(z, len, flags);
+  if (rc != ZR_OK) {
     delete unz;
+    lasterrorU = rc;
     return 0;
   }
-  TUnzipHandleData *han = new TUnzipHandleData;
+
+  auto *han = new TUnzipHandleData;
   han->flag = 1;
   han->unz = unz;
-  return (HZIP)han;
+
+  return reinterpret_cast<HZIP>(han);
 }
 HZIP OpenZipHandle(HANDLE h, const char *password) {
   return OpenZipInternal((void *)h, 0, ZIP_HANDLE, password);
@@ -4304,53 +4285,68 @@ HZIP OpenZip(void *z, unsigned int len, const char *password) {
 }
 
 ZRESULT GetZipItem(HZIP hz, int index, ZIPENTRY *ze) {
-  ze->index = 0;
-  *ze->name = 0;
-  ze->unc_size = 0;
-  if (hz == 0) {
+  if (ze != nullptr) {
+    ze->index = 0;
+    *ze->name = 0;
+    ze->unc_size = 0;
+  }
+
+  if (hz == nullptr) {
     lasterrorU = ZR_ARGS;
     return ZR_ARGS;
   }
-  TUnzipHandleData *han = (TUnzipHandleData *)hz;
+
+  auto *han = reinterpret_cast<TUnzipHandleData *>(hz);
   if (han->flag != 1) {
     lasterrorU = ZR_ZMODE;
     return ZR_ZMODE;
   }
+
   TUnzip *unz = han->unz;
-  lasterrorU = unz->Get(index, ze);
-  return lasterrorU;
+  ZRESULT rc = unz->Get(index, ze);
+  lasterrorU = rc;
+
+  return rc;
 }
 
 ZRESULT FindZipItem(HZIP hz, const TCHAR *name, bool ic, int *index,
                     ZIPENTRY *ze) {
-  if (hz == 0) {
+  if (hz == nullptr) {
     lasterrorU = ZR_ARGS;
     return ZR_ARGS;
   }
-  TUnzipHandleData *han = (TUnzipHandleData *)hz;
+
+  auto *han = reinterpret_cast<TUnzipHandleData *>(hz);
   if (han->flag != 1) {
     lasterrorU = ZR_ZMODE;
     return ZR_ZMODE;
   }
+
   TUnzip *unz = han->unz;
-  lasterrorU = unz->Find(name, ic, index, ze);
-  return lasterrorU;
+  ZRESULT rc = unz->Find(name, ic, index, ze);
+  lasterrorU = rc;
+
+  return rc;
 }
 
-ZRESULT UnzipItemInternal(HZIP hz, int index, void *dst, unsigned int len,
-                          DWORD flags) {
-  if (hz == 0) {
+static ZRESULT UnzipItemInternal(HZIP hz, int index, void *dst,
+                                 unsigned int len, DWORD flags) {
+  if (hz == nullptr) {
     lasterrorU = ZR_ARGS;
     return ZR_ARGS;
   }
-  TUnzipHandleData *han = (TUnzipHandleData *)hz;
+
+  auto *han = reinterpret_cast<TUnzipHandleData *>(hz);
   if (han->flag != 1) {
     lasterrorU = ZR_ZMODE;
     return ZR_ZMODE;
   }
+
   TUnzip *unz = han->unz;
-  lasterrorU = unz->Unzip(index, dst, len, flags);
-  return lasterrorU;
+  ZRESULT rc = unz->Unzip(index, dst, len, flags);
+
+  lasterrorU = rc;
+  return rc;
 }
 ZRESULT UnzipItemHandle(HZIP hz, int index, HANDLE h) {
   return UnzipItemInternal(hz, index, (void *)h, 0, ZIP_HANDLE);
@@ -4363,39 +4359,50 @@ ZRESULT UnzipItem(HZIP hz, int index, void *z, unsigned int len) {
 }
 
 ZRESULT SetUnzipBaseDir(HZIP hz, const TCHAR *dir) {
-  if (hz == 0) {
+  if (hz == nullptr) {
     lasterrorU = ZR_ARGS;
     return ZR_ARGS;
   }
-  TUnzipHandleData *han = (TUnzipHandleData *)hz;
+
+  auto *han = reinterpret_cast<TUnzipHandleData *>(hz);
   if (han->flag != 1) {
     lasterrorU = ZR_ZMODE;
     return ZR_ZMODE;
   }
+
   TUnzip *unz = han->unz;
-  lasterrorU = unz->SetUnzipBaseDir(dir);
-  return lasterrorU;
+  ZRESULT rc = unz->SetUnzipBaseDir(dir);
+  lasterrorU = rc;
+
+  return rc;
 }
 
 ZRESULT CloseZipU(HZIP hz) {
-  if (hz == 0) {
+  if (hz == nullptr) {
     lasterrorU = ZR_ARGS;
     return ZR_ARGS;
   }
-  TUnzipHandleData *han = (TUnzipHandleData *)hz;
+
+  auto *han = reinterpret_cast<TUnzipHandleData *>(hz);
   if (han->flag != 1) {
     lasterrorU = ZR_ZMODE;
     return ZR_ZMODE;
   }
+
   TUnzip *unz = han->unz;
-  lasterrorU = unz->Close();
+  ZRESULT rc = unz->Close();
+
   delete unz;
   delete han;
-  return lasterrorU;
+
+  lasterrorU = rc;
+  return rc;
 }
 
 bool IsZipHandleU(HZIP hz) {
-  if (hz == 0) return false;
-  TUnzipHandleData *han = (TUnzipHandleData *)hz;
+  if (hz == nullptr) return false;
+
+  const auto *han = reinterpret_cast<TUnzipHandleData *>(hz);
+
   return (han->flag == 1);
 }
