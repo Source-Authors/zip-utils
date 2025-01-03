@@ -10,7 +10,13 @@
 typedef unsigned long DWORD;
 typedef char TCHAR;
 typedef FILE* HANDLE;
-typedef time_t FILETIME;
+#else
+#define MAX_PATH 260
+// An HZIP identifies a zip file that is being created
+using HZIP = struct HZIP__*;
+typedef unsigned long DWORD;
+typedef char TCHAR;
+typedef void *HANDLE;
 #endif
 
 // ZIP functions -- for creating zip files
@@ -20,10 +26,6 @@ typedef time_t FILETIME;
 // extend its use in Windows/C++. Also to add encryption and unicode.
 
 
-#ifndef _unzip_H
-DECLARE_HANDLE(HZIP);
-#endif
-// An HZIP identifies a zip file that is being created
 
 typedef DWORD ZRESULT;
 // return codes from any of the zip functions. Listed later.

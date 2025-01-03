@@ -11,6 +11,19 @@ typedef unsigned long DWORD;
 typedef char TCHAR;
 typedef FILE* HANDLE;
 typedef time_t FILETIME;
+typedef FILETIME ZIP_FILETIME;
+#else
+#define MAX_PATH 260
+// An HZIP identifies a zip file that is being created
+using HZIP = struct HZIP__*;
+typedef unsigned long DWORD;
+typedef char TCHAR;
+typedef void *HANDLE;
+// Actually typedef for FILETIME on Windows.
+struct ZIP_FILETIME {
+  DWORD dwLowDateTime;
+  DWORD dwHighDateTime;
+};
 #endif
 
 // UNZIPPING functions -- for unzipping.
@@ -21,10 +34,6 @@ typedef time_t FILETIME;
 // encryption and unicode filenames have been added.
 
 
-#ifndef _zip_H
-DECLARE_HANDLE(HZIP);
-#endif
-// An HZIP identifies a zip file that has been opened
 
 typedef DWORD ZRESULT;
 // return codes from any of the zip functions. Listed later.
@@ -33,7 +42,7 @@ typedef struct
 { int index;                 // index of this file within the zip
   TCHAR name[MAX_PATH];      // filename within the zip
   DWORD attr;                // attributes, as in GetFileAttributes.
-  FILETIME atime,ctime,mtime;// access, create, modify filetimes
+  ZIP_FILETIME atime, ctime, mtime;  // access, create, modify filetimes
   long comp_size;            // sizes of item, compressed and uncompressed. These
   long unc_size;             // may be -1 if not yet known (e.g. being streamed in)
 } ZIPENTRY;

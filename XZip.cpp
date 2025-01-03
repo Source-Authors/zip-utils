@@ -1,15 +1,15 @@
 #ifdef ZIP_STD
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <time.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstdarg>
+#include <ctime>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <memory.h>
-#include <string.h>
-#include <ctype.h>
+#include <cstring>
+#include <cctype>
 
-#include "zip.h"
+#include "XZip.h"
 //
 typedef unsigned short WORD;
 #define _tcslen strlen
@@ -28,11 +28,11 @@ typedef unsigned short WORD;
 
 //
 #else
+#include "XZip.h"
 #include <windows.h>
 #include <tchar.h>
-#include <ctype.h>
-#include <stdio.h>
-#include "XZip.h"
+#include <cctype>
+#include <cstdio>
 #endif
 
 

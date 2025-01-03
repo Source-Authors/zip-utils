@@ -1,8 +1,8 @@
 #ifdef ZIP_STD
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 #include <malloc.h>
-#include <time.h>
+#include <ctime>
 #ifdef _MSC_VER
 #include <sys/utime.h> // microsoft puts it here
 #else
@@ -17,7 +17,7 @@
 #endif
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "unzip.h"
+#include "XUnzip.h"
 //
 typedef unsigned short WORD;
 #define _tcslen strlen
@@ -35,12 +35,12 @@ typedef unsigned short WORD;
 #endif
 //
 #else
-#include <windows.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <tchar.h>
 #include "XUnzip.h"
+#include <tchar.h>
+#include <windows.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #endif
 //
 #ifdef UNICODE
@@ -4020,7 +4020,11 @@ ZRESULT TUnzip::Get(int index,ZIPENTRY *ze)
   WORD dosdate = (WORD)((ufi.dosDate>>16)&0xFFFF);
   FILETIME ftd = dosdatetime2filetime(dosdate,dostime);
   FILETIME ft; LocalFileTimeToFileTime(&ftd,&ft);
-  ze->atime=ft; ze->ctime=ft; ze->mtime=ft;
+  static_assert(alignof(ZIP_FILETIME) == alignof(FILETIME));
+  static_assert(sizeof(ZIP_FILETIME) == sizeof(FILETIME));
+  ze->atime=*reinterpret_cast<ZIP_FILETIME*>(&ft);
+  ze->ctime=*reinterpret_cast<ZIP_FILETIME*>(&ft);
+  ze->mtime=*reinterpret_cast<ZIP_FILETIME*>(&ft);
   // the zip will always have at least that dostime. But if it also has
   // an extra header, then we'll instead get the info from that.
   unsigned int epos=0;
@@ -4036,17 +4040,20 @@ ZRESULT TUnzip::Get(int index,ZIPENTRY *ze)
     if (hasmtime)
     { lutime_t mtime = ((extra[epos+0])<<0) | ((extra[epos+1])<<8) |((extra[epos+2])<<16) | ((extra[epos+3])<<24);
 	  epos+=4;
-      ze->mtime = timet2filetime(mtime);
+      FILETIME mft = timet2filetime(mtime);
+      ze->mtime = *reinterpret_cast<ZIP_FILETIME*>(&mft);
     }
     if (hasatime)
     { lutime_t atime = ((extra[epos+0])<<0) | ((extra[epos+1])<<8) |((extra[epos+2])<<16) | ((extra[epos+3])<<24);
       epos+=4;
-      ze->atime = timet2filetime(atime);
+      FILETIME aft = timet2filetime(atime);
+      ze->atime = *reinterpret_cast<ZIP_FILETIME*>(&aft);
     }
     if (hasctime)
     { lutime_t ctime = ((extra[epos+0])<<0) | ((extra[epos+1])<<8) |((extra[epos+2])<<16) | ((extra[epos+3])<<24);
       epos+=4;
-      ze->ctime = timet2filetime(ctime);
+      FILETIME cft = timet2filetime(ctime);
+      ze->ctime = *reinterpret_cast<ZIP_FILETIME*>(&cft);
     }
     break;
   }
@@ -4197,7 +4204,9 @@ ZRESULT TUnzip::Unzip(int index,void *dst,unsigned int len,DWORD flags)
   if (flags!=ZIP_HANDLE) fclose(h);
   if (*fn!=0) {struct utimbuf ubuf; ubuf.actime=ze.atime; ubuf.modtime=ze.mtime; utime(fn,&ubuf);}
 #else
-  if (!haderr) SetFileTime(h,&ze.ctime,&ze.atime,&ze.mtime); // may fail if it was a pipe
+  static_assert(alignof(ZIP_FILETIME) == alignof(FILETIME));
+  static_assert(sizeof(ZIP_FILETIME) == sizeof(FILETIME));
+  if (!haderr) SetFileTime(h,reinterpret_cast<FILETIME*>(&ze.ctime),reinterpret_cast<FILETIME*>(&ze.atime),reinterpret_cast<FILETIME*>(&ze.mtime)); // may fail if it was a pipe
   if (flags!=ZIP_HANDLE) CloseHandle(h);
 #endif
   if (haderr!=0) return haderr;
