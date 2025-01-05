@@ -1,50 +1,62 @@
-#include <cstdio>
+﻿#include <cstdio>
 #include <memory>
+#include <new>
 
 #include "../../XUnzip.h"
 #include "../../XZip.h"
 
 namespace {
 
-bool fsame(const char *fn0, const char *fn1) {
-  FILE *hf0 = fopen(fn0, "rb");
-  FILE *hf1 = fopen(fn1, "rb");
-  if (hf0 == nullptr || hf1 == nullptr) {
-    if (hf0 != nullptr) fclose(hf0);
-    if (hf1 != nullptr) fclose(hf1);
-    return false;
-  }
+struct FileDeleter {
+  void operator()(FILE *f) const noexcept { fclose(f); }
+};
 
-  fseek(hf0, 0, SEEK_END);
-  long size0 = ftell(hf0);
-  fseek(hf0, 0, SEEK_SET);
+long fsize(const std::unique_ptr<FILE, FileDeleter> &f) noexcept {
+  if (fseek(f.get(), 0, SEEK_END) == -1) return -1;
 
-  fseek(hf1, 0, SEEK_END);
-  long size1 = ftell(hf1);
-  fseek(hf1, 0, SEEK_SET);
+  const long size = ftell(f.get());
 
-  if (size0 != size1) {
-    fclose(hf0);
-    fclose(hf1);
-    return false;
-  }
+  if (fseek(f.get(), 0, SEEK_SET) == -1) return -1;
+
+  return size;
+}
+
+bool fsame(const char *fn0, const char *fn1) noexcept {
+  using file_ptr = std::unique_ptr<FILE, FileDeleter>;
+
+  file_ptr hf0{fopen(fn0, "rb")};
+  file_ptr hf1{fopen(fn1, "rb")};
+
+  if (!hf0 || !hf1) return false;
+
+  const long size0 = fsize(hf0);
+  if (size0 == -1) return false;
+
+  const long size1 = fsize(hf1);
+  if (size1 == -1) return false;
+
+  if (size0 != size1) return false;
+
   long size = size0;
   //
   constexpr int readsize = 65535;
-  std::unique_ptr<char[]> buf0 = std::make_unique<char[]>(readsize);
-  std::unique_ptr<char[]> buf1 = std::make_unique<char[]>(readsize);
+  std::unique_ptr<char[]> buf0{new (std::nothrow) char[readsize]};
+  std::unique_ptr<char[]> buf1{new (std::nothrow) char[readsize]};
+
+  if (!buf0 || !buf1) return false;
+
   long done = 0;
   while (done < size) {
     long left = size - done;
 
     if (left > readsize) left = readsize;
 
-    size_t read = fread(buf0.get(), left, 1, hf0);
+    size_t read = fread(buf0.get(), left, 1, hf0.get());
     if (read != 1) {
       break;
     }
 
-    read = fread(buf1.get(), left, 1, hf1);
+    read = fread(buf1.get(), left, 1, hf1.get());
     if (read != 1) {
       break;
     }
@@ -54,17 +66,15 @@ bool fsame(const char *fn0, const char *fn1) {
     done += left;
   }
 
-  fclose(hf0);
-  fclose(hf1);
   return (done == size);
 }
 
-}  // namespace
-
 bool any_errors = false;
 bool p_abort = false;
+
 void msg(const TCHAR *s) {
   if (s[0] == '*') any_errors = true;
+
 #ifdef UNDER_CE
   int res = IDOK;
   if (s[0] == '*')
@@ -82,6 +92,8 @@ void msg(const TCHAR *s) {
     fprintf(stderr, "%s\n", s);
 #endif
 }
+
+}  // namespace
 
 int main() {
   HZIP hz = CreateZip("std1.zip", nullptr);
@@ -126,8 +138,8 @@ int main() {
   if (any_errors) {
     msg("Finished");
     return 1;
-  } else {
-    msg("Finished. No errors.");
-    return 0;
   }
+
+  msg("Finished. No errors.");
+  return 0;
 }

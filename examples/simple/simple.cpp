@@ -1,6 +1,7 @@
-#include <stdio.h>
 #include <tchar.h>
 #include <windows.h>
+
+#include <cstdio>
 
 #include "../../XUnzip.h"
 #include "../../XZip.h"

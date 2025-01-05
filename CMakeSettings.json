@@ -9,7 +9,13 @@
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "variables": []
+      "variables": [
+        {
+          "name": "BUILD_SHARED_LIBS",
+          "value": "True",
+          "type": "BOOL"
+        }
+      ]
     }
   ]
 }

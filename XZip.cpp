@@ -1,4 +1,4 @@
-// THIS FILE is almost entirely based upon code by info-zip.
+﻿// THIS FILE is almost entirely based upon code by info-zip.
 // It has been modified by Lucian Wischik. The modifications
 // were a complete rewrite of the bit of code that generates the
 // layout of the zipfile, and support for zipping to/from memory
@@ -70,6 +70,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <string_view>
 //
 typedef unsigned short WORD;
 #define _tcslen strlen
@@ -96,6 +97,7 @@ typedef unsigned short WORD;
 
 #include <cctype>
 #include <cstdio>
+#include <string_view>
 #endif
 
 #include <new>
@@ -3082,8 +3084,8 @@ ZRESULT TZip::Add(const TCHAR *odstzn, void *src, unsigned int len,
 
   ZRESULT writeres = ZR_OK;
   if (password != 0 && !isdir) {
-    unsigned written = swrite(this, vencbuf, ARRAYSIZE(vencbuf));
-    if (written != ARRAYSIZE(vencbuf)) {
+    unsigned written = swrite(this, vencbuf, std::size(vencbuf));
+    if (written != std::size(vencbuf)) {
       writeres = ZR_WRITE;
     }
     writ += written;

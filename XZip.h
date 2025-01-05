@@ -1,4 +1,4 @@
-// ZIP functions -- for creating zip files
+﻿// ZIP functions -- for creating zip files
 //
 // This file is a repackaged form of the Info-Zip source code available at
 // www.info-zip.org.  The original copyright notice may be found in XZip.cpp.
@@ -97,6 +97,45 @@ typedef void *HANDLE;
 
 #include "XZresult.h"
 
+#if defined(_MSC_VER)
+/*
+ * @brief Exports functions, data, and objects from a DLL.
+ *
+ * "If a class is marked declspec(dllexport), any specializations of class
+ * templates in the class hierarchy are implicitly marked as
+ * declspec(dllexport).  This means that class templates are explicitly
+ * instantiated and the class's members must be defined."
+ *
+ * See https://docs.microsoft.com/en-us/cpp/cpp/dllexport-dllimport
+ */
+#define ZU_ZIP_ATTRIBUTE_SHARED_EXPORT __declspec(dllexport)
+/*
+ * @brief Imports functions, data, and objects from a DLL.
+ *
+ * See https://docs.microsoft.com/en-us/cpp/cpp/dllexport-dllimport
+ */
+#define ZU_ZIP_ATTRIBUTE_SHARED_IMPORT __declspec(dllimport)
+#elif defined(__clang__) || defined(__GNUC__)
+/*
+ * @brief Exports functions, data, and objects from a shared library.
+ */
+#define ZU_ZIP_ATTRIBUTE_SHARED_EXPORT __attribute__((visibility("default")))
+/*
+ * @brief Imports functions, data, and objects from a shared library.
+ */
+#define ZU_ZIP_ATTRIBUTE_SHARED_IMPORT
+#endif
+
+#ifdef ZU_ZIP_BUILD_SHARED
+#ifdef ZU_ZIP_BUILD_ITSELF
+#define ZU_ZIP_ATTRIBUTE_SHARED ZU_ZIP_ATTRIBUTE_SHARED_EXPORT
+#else
+#define ZU_ZIP_ATTRIBUTE_SHARED ZU_ZIP_ATTRIBUTE_SHARED_IMPORT
+#endif
+#else
+#define ZU_ZIP_ATTRIBUTE_SHARED
+#endif
+
 // CreateZip - call this to start the creation of a zip file.
 //
 // As the zip is being created, it will be stored somewhere:
@@ -131,9 +170,10 @@ typedef void *HANDLE;
 // NOTE: for windows-ce, you cannot close the handle until after CloseZip.  But
 // for real windows, the zip makes its own copy of your handle, so you can close
 // yours anytime.
-HZIP CreateZip(const TCHAR *fn, const char *password);
-HZIP CreateZip(void *buf, unsigned int len, const char *password);
-HZIP CreateZipHandle(HANDLE h, const char *password);
+ZU_ZIP_ATTRIBUTE_SHARED HZIP CreateZip(const TCHAR *fn, const char *password);
+ZU_ZIP_ATTRIBUTE_SHARED HZIP CreateZip(void *buf, unsigned int len,
+                                       const char *password);
+ZU_ZIP_ATTRIBUTE_SHARED HZIP CreateZipHandle(HANDLE h, const char *password);
 
 // ZipAdd - call this for each file to be added to the zip.
 //
@@ -151,18 +191,23 @@ HZIP CreateZipHandle(HANDLE h, const char *password);
 // function.  This will let the zipfile store the item's size ahead of the
 // compressed item itself, which in turn makes it easier when unzipping the
 // zipfile from a pipe.
-ZRESULT ZipAdd(HZIP hz, const TCHAR *dstzn, const TCHAR *fn);
-ZRESULT ZipAdd(HZIP hz, const TCHAR *dstzn, void *src, unsigned int len);
-ZRESULT ZipAddHandle(HZIP hz, const TCHAR *dstzn, HANDLE h);
-ZRESULT ZipAddHandle(HZIP hz, const TCHAR *dstzn, HANDLE h, unsigned int len);
-ZRESULT ZipAddFolder(HZIP hz, const TCHAR *dstzn);
+ZU_ZIP_ATTRIBUTE_SHARED ZRESULT ZipAdd(HZIP hz, const TCHAR *dstzn,
+                                       const TCHAR *fn);
+ZU_ZIP_ATTRIBUTE_SHARED ZRESULT ZipAdd(HZIP hz, const TCHAR *dstzn, void *src,
+                                       unsigned int len);
+ZU_ZIP_ATTRIBUTE_SHARED ZRESULT ZipAddHandle(HZIP hz, const TCHAR *dstzn,
+                                             HANDLE h);
+ZU_ZIP_ATTRIBUTE_SHARED ZRESULT ZipAddHandle(HZIP hz, const TCHAR *dstzn,
+                                             HANDLE h, unsigned int len);
+ZU_ZIP_ATTRIBUTE_SHARED ZRESULT ZipAddFolder(HZIP hz, const TCHAR *dstzn);
 
 // ZipGetMemory - If the zip was created in memory, via ZipCreate(0,len), then
 // this function will return information about that memory block.  Buf will
 // receive a pointer to its start, and len its length.
 //
 // NOTE: you can't add any more after calling this.
-ZRESULT ZipGetMemory(HZIP hz, void **buf, unsigned long *len);
+ZU_ZIP_ATTRIBUTE_SHARED ZRESULT ZipGetMemory(HZIP hz, void **buf,
+                                             unsigned long *len);
 
 // Now we indulge in a little skullduggery so that the code works whether the
 // user has included just zip or both zip and unzip.
@@ -171,21 +216,24 @@ ZRESULT ZipGetMemory(HZIP hz, void **buf, unsigned long *len);
 // cpp files for zip and unzip are both present, so we will call one or the
 // other of them based on a dynamic choice.  If the header file for only one is
 // present, then we will bind to that particular one.
-ZRESULT CloseZipZ(HZIP hz);
+ZU_ZIP_ATTRIBUTE_SHARED ZRESULT CloseZipZ(HZIP hz);
 
 // FormatZipMessage - given an error code, formats it as a string.
 //
 // It returns the length of the error message.  If buf/len points to a real
 // buffer, then it also writes as much as possible into there.
-size_t FormatZipMessageZ(ZRESULT code, char *buf, size_t len);
+ZU_ZIP_ATTRIBUTE_SHARED size_t FormatZipMessageZ(ZRESULT code, char *buf,
+                                                 size_t len);
 
 // IsZipHandleU - is handle zip one.
-bool IsZipHandleZ(HZIP hz);
+ZU_ZIP_ATTRIBUTE_SHARED bool IsZipHandleZ(HZIP hz);
 
 #ifdef ZIP_UTILS_XUNZIP_H_
 #undef CloseZip
 // CloseZip - the zip handle must be closed with this function.
-#define CloseZip(hz) (IsZipHandleZ(hz) ? CloseZipZ(hz) : CloseZipU(hz))
+inline ZRESULT CloseZip(HZIP hz) {
+  return IsZipHandleZ(hz) ? CloseZipZ(hz) : CloseZipU(hz);
+}
 #else
 // CloseZip - the zip handle must be closed with this function.
 #define CloseZip CloseZipZ
