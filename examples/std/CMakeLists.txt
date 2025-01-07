@@ -51,19 +51,3 @@ set_target_properties(${PACKAGE_NAME}
     VERSION ${PACKAGE_VER_MAJOR}.${PACKAGE_VER_MINOR}
     SOVERSION ${PACKAGE_VER_MAJOR}.${PACKAGE_VER_MINOR}
 )
-
-add_custom_command(
-  TARGET ${PACKAGE_NAME} POST_BUILD
-  COMMAND
-    ${CMAKE_COMMAND} -E copy
-    ${PROJECT_SOURCE_DIR}/std_sample.jpg
-    ${PROJECT_BINARY_DIR}/std_sample.jpg
-)
-
-add_custom_command(
-  TARGET ${PACKAGE_NAME} POST_BUILD
-  COMMAND
-    ${CMAKE_COMMAND} -E copy
-    ${PROJECT_SOURCE_DIR}/std_sample.txt
-    ${PROJECT_BINARY_DIR}/std_sample.txt
-)
