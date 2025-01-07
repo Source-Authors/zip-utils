@@ -685,12 +685,15 @@ ZRESULT GetFileInfo(FILE *hf, ulg *attr, long *size, iztimes *times,
 
 // ----------------------------------------------------------------------
 #else
-void filetime2dosdatetime(
-    const FILETIME ft, WORD *dosdate,
-    WORD *dostime) {  // date: bits 0-4 are day of month 1-31. Bits 5-8 are
-                      // month 1..12. Bits 9-15 are year-1980
-  // time: bits 0-4 are seconds/2, bits 5-10 are minute 0..59. Bits 11-15 are
-  // hour 0..23
+// date:
+// bits 0-4 are day of month 1-31.
+// Bits 5-8 are month 1..12.
+// Bits 9-15 are year-1980
+// time:
+// bits 0-4 are seconds/2,
+// bits 5-10 are minute 0..59.
+// Bits 11-15 are hour 0..23
+void filetime2dosdatetime(const FILETIME ft, WORD *dosdate, WORD *dostime) {
   SYSTEMTIME st;
   FileTimeToSystemTime(&ft, &st);
   *dosdate = (WORD)(((st.wYear - 1980) & 0x7f) << 9);
@@ -808,20 +811,20 @@ ZRESULT GetFileInfo(HANDLE hf, ulg *attr, long *size, iztimes *times,
 #endif
 // ----------------------------------------------------------------------
 
-void Assert(TState &state, bool cond, const char *msg) {
+[[maybe_unused]] void Assert(TState &state, bool cond, const char *msg) {
   if (cond) return;
   state.err = msg;
 }
-void Trace(const char *x, ...) {
+[[maybe_unused]] void Trace(const char *x, ...) {
   va_list paramList;
   va_start(paramList, x);
-  paramList;
+  // paramList;
   va_end(paramList);
 }
-void Tracec(bool, const char *x, ...) {
+[[maybe_unused]] void Tracec(bool, const char *x, ...) {
   va_list paramList;
   va_start(paramList, x);
-  paramList;
+  // paramList;
   va_end(paramList);
 }
 
@@ -2200,8 +2203,7 @@ ulg deflate(TState &state) {
 }
 
 // Write a local header described by *z to file *f. Return a ZE_ error code.
-int putlocal(struct zlist *z, WRITEFUNC wfunc,
-             void *param) {  
+int putlocal(struct zlist *z, WRITEFUNC wfunc, void *param) {
   PUTLG(LOCSIG, f);
   PUTSH(z->ver, f);
   PUTSH(z->lflg, f);
@@ -2408,20 +2410,20 @@ bool HasZipSuffix(const TCHAR *fn) {
 class TZip {
  public:
   explicit TZip(const char *pwd) noexcept
-      : hfout(nullptr),
+      : password(nullptr),
+        hfout(nullptr),
         mustclosehfout(false),
         hmapout(nullptr),
-        zfis(nullptr),
-        obuf(nullptr),
-        hfin(nullptr),
-        writ(0),
-        oerr(ZR_OK),
-        hasputcen(false),
         ooffset(0),
+        oerr(ZR_OK),
+        writ(0),
+        obuf(nullptr),
+        hasputcen(false),
         encwriting(false),
         encbuf(nullptr),
-        password(nullptr),
-        state(nullptr) {
+        zfis(nullptr),
+        state(nullptr),
+        hfin(nullptr) {
     memset(this, 0, sizeof(*this));
 
     if (pwd && *pwd) {
@@ -3490,16 +3492,19 @@ size_t FormatZipMessageZ(ZRESULT code, char *buf, size_t len) {
     case ZR_FLATE:
       msg = "Zip-bug: an internal error during flation";
       break;
+    default:
+      // Use default one.
+      break;
   }
 
   const size_t mlen{strlen(msg)};
-  if (buf == nullptr || len == 0) return mlen;
 
-  size_t n{mlen};
-  if (n + 1 > len) n = len - 1;
+  if (buf == nullptr || len == 0 || mlen > len - 1) {
+    return mlen;
+  }
 
-  strncpy(buf, msg, n);
-  buf[n] = '\0';
+  strcpy(buf, msg);
+  buf[mlen] = '\0';
 
   return mlen;
 }

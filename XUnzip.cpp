@@ -87,9 +87,10 @@
 typedef unsigned short WORD;
 #define _tcslen strlen
 #define _tcsicmp stricmp
+#define _tcscpy strcpy
 #define _tcsncpy strncpy
 #define _tcsstr strstr
-#define _sntprintf _snprintf
+#define _sntprintf snprintf
 #define INVALID_HANDLE_VALUE nullptr
 #define INVALID_SET_FILE_POINTER 0xFFFFFFFFUL
 #ifndef _T
@@ -119,7 +120,6 @@ typedef unsigned short WORD;
 enum ZipMode { ZIP_HANDLE = 1, ZIP_FILENAME = 2, ZIP_MEMORY = 3 };
 
 #define zmalloc(len) malloc(len)
-
 #define zfree(p) free(p)
 
 namespace {
@@ -491,16 +491,16 @@ typedef unsigned short ush;
 typedef ush ushf;
 typedef unsigned long ulg;
 
-constexpr char *const z_errmsg[10] = {  // indexed by 2-zlib_error
-    "need dictionary",                  // Z_NEED_DICT       2
-    "stream end",                       // Z_STREAM_END      1
-    "",                                 // Z_OK              0
-    "file error",                       // Z_ERRNO         (-1)
-    "stream error",                     // Z_STREAM_ERROR  (-2)
-    "data error",                       // Z_DATA_ERROR    (-3)
-    "insufficient memory",              // Z_MEM_ERROR     (-4)
-    "buffer error",                     // Z_BUF_ERROR     (-5)
-    "incompatible version",             // Z_VERSION_ERROR (-6)
+constexpr char const z_errmsg[10][21] = {  // indexed by 2-zlib_error
+    "need dictionary",                     // Z_NEED_DICT       2
+    "stream end",                          // Z_STREAM_END      1
+    "",                                    // Z_OK              0
+    "file error",                          // Z_ERRNO         (-1)
+    "stream error",                        // Z_STREAM_ERROR  (-2)
+    "data error",                          // Z_DATA_ERROR    (-3)
+    "insufficient memory",                 // Z_MEM_ERROR     (-4)
+    "buffer error",                        // Z_BUF_ERROR     (-5)
+    "incompatible version",                // Z_VERSION_ERROR (-6)
     ""};
 
 #define ERR_MSG(err) z_errmsg[Z_NEED_DICT - (err)]
@@ -1525,7 +1525,7 @@ int inflate_blocks_free(inflate_blocks_statef *s, z_streamp z) {
 // For conditions of distribution and use, see copyright notice in zlib.h
 //
 
-extern const char inflate_copyright[] =
+[[maybe_unused]] extern const char inflate_copyright[] =
     " inflate 1.1.3 Copyright 1995-1998 Mark Adler ";
 // If you use the zlib library in a product, an acknowledgment is welcome
 // in the documentation of your product. If for some reason you cannot
@@ -1635,7 +1635,7 @@ int huft_build(uInt *b,           // code lengths in bits (all assumed <= BMAX)
 #define C2 C0 C0 C0 C0
 #define C4 C2 C2 C2 C2
   C4;
-  p;  // clear c[]--assume BMAX+1 is 16
+  // clear c[]--assume BMAX+1 is 16
   p = b;
   i = n;
   do {
@@ -2091,7 +2091,7 @@ constexpr uLong crc_table[256] = {
     0x5d681b02L, 0x2a6f2b94L, 0xb40bbe37L, 0xc30c8ea1L, 0x5a05df1bL,
     0x2d02ef8dL};
 
-const uLong *get_crc_table() { return crc_table; }
+[[maybe_unused]] const uLong *get_crc_table() { return crc_table; }
 
 #define CRC_DO1(buf) crc = crc_table[((int)crc ^ (*buf++)) & 0xff] ^ (crc >> 8);
 #define CRC_DO2(buf) \
@@ -2195,11 +2195,11 @@ uLong adler32(uLong adler, const Byte *buf, uInt len) {
 // For conditions of distribution and use, see copyright notice in zlib.h
 // @(#) $Id$
 
-const char *zlibVersion() { return ZLIB_VERSION; }
+[[maybe_unused]] const char *zlibVersion() { return ZLIB_VERSION; }
 
 // exported to allow conversion of error code to string for compress() and
 // uncompress()
-const char *zError(int err) { return ERR_MSG(err); }
+[[maybe_unused]] const char *zError(int err) { return ERR_MSG(err); }
 
 voidpf zcalloc(voidpf opaque, unsigned items, unsigned size) {
   if (opaque) items += size - size;  // make compiler happy
@@ -2398,7 +2398,6 @@ int inflate(z_streamp z, int f) {
         z->state->mode = IM_DICT1;
       case IM_DICT1:
         IM_NEEDBYTE;
-        r;
         z->state->sub.check.need += (uLong)IM_NEXTBYTE;
         z->adler = z->state->sub.check.need;
         z->state->mode = IM_DICT0;
@@ -2730,25 +2729,6 @@ typedef struct {
 int unzStringFileNameCompare(const char *fileName1, const char *fileName2,
                              int iCaseSensitivity);
 
-//  Give the current position in uncompressed data
-z_off_t unztell(unzFile file);
-
-//  return 1 if the end of file was reached, 0 elsewhere
-int unzeof(unzFile file);
-
-//  Read extra field from the current file (opened by unzOpenCurrentFile)
-//  This is the local-header version of the extra field (sometimes, there is
-//    more info in the local-header version than in the central-header)
-//
-//  if buf==nullptr, it return the size of the local extra field
-//
-//  if buf!=nullptr, len is the size of the buffer, the extra header is copied
-//  in
-//	buf.
-//  the return value is the number of bytes copied in buf, or (if <0)
-//	the error code
-int unzGetLocalExtrafield(unzFile file, voidp buf, unsigned len);
-
 // ===========================================================================
 //   Read a byte from a gz_stream; update next_in and avail_in. Return EOF
 // for end of file.
@@ -2762,13 +2742,14 @@ int unzlocal_getByte(LUFILE *fin, int *pi) {
     return UNZ_OK;
   }
 
+  *pi = 0;
   return luferror(fin) ? UNZ_ERRNO : UNZ_EOF;
 }
 
 // ===========================================================================
 // Reads a long in LSB order from the given gz_stream. Sets
 int unzlocal_getShort(LUFILE *fin, uLong *pX) {
-  int i;
+  int i{0};
   int err{unzlocal_getByte(fin, &i)};
   uLong x{(uLong)i};
 
@@ -2784,7 +2765,7 @@ int unzlocal_getShort(LUFILE *fin, uLong *pX) {
 }
 
 int unzlocal_getLong(LUFILE *fin, uLong *pX) {
-  int i;
+  int i{0};
   int err{unzlocal_getByte(fin, &i)};
   uLong x{(uLong)i};
 
@@ -2850,7 +2831,7 @@ uLong unzlocal_SearchCentralDir(LUFILE *fin) {
   long uMaxBack{0xFFFF};  // maximum size of global comment
   if (uMaxBack > uSizeFile) uMaxBack = uSizeFile;
 
-  constexpr size_t bufSize{BUFREADCOMMENT + 4};
+  constexpr long bufSize{BUFREADCOMMENT + 4};
   auto buf = std::make_unique<unsigned char[]>(bufSize);
   if (!buf) return 0xFFFFFFFF;
 
@@ -2995,17 +2976,6 @@ int unzClose(unzFile file) {
   return rc == 0 ? UNZ_OK : UNZ_EOF;
 }
 
-//  Write info about the ZipFile in the *pglobal_info structure.  No preparation
-//  of the structure is needed return UNZ_OK if there is no problem.
-int unzGetGlobalInfo(unzFile file, unz_global_info *pglobal_info) {
-  if (file == nullptr) return UNZ_PARAMERROR;
-
-  unz_s *s{file};
-  *pglobal_info = s->gi;
-
-  return UNZ_OK;
-}
-
 //   Translate date/time from Dos format to tm_unz (readable more easilty)
 void unzlocal_DosDateToTmuDate(uLong ulDosDate, tm_unz *ptm) {
   uLong uDate = (uLong)(ulDosDate >> 16);
@@ -3043,11 +3013,13 @@ int unzlocal_GetCurrentFileInfoInternal(
     err = UNZ_ERRNO;
 
   // we check the magic
-  if (err == UNZ_OK)
-    if (unzlocal_getLong(s->file, &uMagic) != UNZ_OK)
+  if (err == UNZ_OK) {
+    if (unzlocal_getLong(s->file, &uMagic) != UNZ_OK) {
       err = UNZ_ERRNO;
-    else if (uMagic != 0x02014b50)
+    } else if (uMagic != 0x02014b50) {
       err = UNZ_BADZIPFILE;
+    }
+  }
 
   if (unzlocal_getShort(s->file, &file_info.version) != UNZ_OK) err = UNZ_ERRNO;
 
@@ -3115,11 +3087,13 @@ int unzlocal_GetCurrentFileInfoInternal(
     else
       uSizeRead = extraFieldBufferSize;
 
-    if (lSeek != 0)
-      if (lufseek(s->file, lSeek, SEEK_CUR) == 0)
+    if (lSeek != 0) {
+      if (lufseek(s->file, lSeek, SEEK_CUR) == 0) {
         lSeek = 0;
-      else
+      } else {
         err = UNZ_ERRNO;
+      }
+    }
 
     if ((file_info.size_file_extra > 0) && (extraFieldBufferSize > 0))
       if (lufread(extraField, (uInt)uSizeRead, 1, s->file) != 1)
@@ -3138,10 +3112,9 @@ int unzlocal_GetCurrentFileInfoInternal(
       uSizeRead = commentBufferSize;
 
     if (lSeek != 0)
-      if (lufseek(s->file, lSeek, SEEK_CUR) == 0) {
-      }  // unused lSeek=0;
-      else
+      if (lufseek(s->file, lSeek, SEEK_CUR) != 0) {
         err = UNZ_ERRNO;
+      }
 
     if ((file_info.size_file_comment > 0) && (commentBufferSize > 0))
       if (lufread(szComment, (uInt)uSizeRead, 1, s->file) != 1) err = UNZ_ERRNO;
@@ -3439,7 +3412,7 @@ int unzReadCurrentFile(unzFile file, voidp buf, unsigned len,
 
   file_in_zip_read_info_s *pfile_in_zip_read_info = s->pfile_in_zip_read;
   if (pfile_in_zip_read_info == nullptr) return UNZ_PARAMERROR;
-  if ((pfile_in_zip_read_info->read_buffer == nullptr)) {
+  if (pfile_in_zip_read_info->read_buffer == nullptr) {
     return UNZ_END_OF_LIST_OF_FILE;
   }
 
@@ -3556,76 +3529,6 @@ int unzReadCurrentFile(unzFile file, voidp buf, unsigned len,
   return err;
 }
 
-//  Give the current position in uncompressed data
-z_off_t unztell(unzFile file) {
-  if (file == nullptr) return UNZ_PARAMERROR;
-
-  unz_s *s{file};
-  file_in_zip_read_info_s *pfile_in_zip_read_info = s->pfile_in_zip_read;
-
-  if (pfile_in_zip_read_info == nullptr) return UNZ_PARAMERROR;
-
-  return (z_off_t)pfile_in_zip_read_info->stream.total_out;
-}
-
-//  return 1 if the end of file was reached, 0 elsewhere
-int unzeof(unzFile file) {
-  if (file == nullptr) return UNZ_PARAMERROR;
-
-  unz_s *s{file};
-  file_in_zip_read_info_s *pfile_in_zip_read_info = s->pfile_in_zip_read;
-
-  if (pfile_in_zip_read_info == nullptr) return UNZ_PARAMERROR;
-
-  if (pfile_in_zip_read_info->rest_read_uncompressed == 0)
-    return 1;
-  else
-    return 0;
-}
-
-//  Read extra field from the current file (opened by unzOpenCurrentFile)
-//  This is the local-header version of the extra field (sometimes, there is
-//    more info in the local-header version than in the central-header)
-//  if buf==nullptr, it return the size of the local extra field that can be
-//  read if buf!=nullptr, len is the size of the buffer, the extra header is
-//  copied in buf. the return value is the number of bytes copied in buf, or (if
-//  <0) the error code
-int unzGetLocalExtrafield(unzFile file, voidp buf, unsigned len) {
-  if (file == nullptr) return UNZ_PARAMERROR;
-
-  unz_s *s{file};
-  file_in_zip_read_info_s *pfile_in_zip_read_info = s->pfile_in_zip_read;
-
-  if (pfile_in_zip_read_info == nullptr) return UNZ_PARAMERROR;
-
-  const uLong size_to_read{pfile_in_zip_read_info->size_local_extrafield -
-                           pfile_in_zip_read_info->pos_local_extrafield};
-
-  if (buf == nullptr) return (int)size_to_read;
-
-  uInt read_now;
-
-  if (len > size_to_read)
-    read_now = (uInt)size_to_read;
-  else
-    read_now = (uInt)len;
-
-  if (read_now == 0) return 0;
-
-  if (lufseek(pfile_in_zip_read_info->file,
-              pfile_in_zip_read_info->offset_local_extrafield +
-                  pfile_in_zip_read_info->pos_local_extrafield,
-              SEEK_SET) != 0) {
-    return UNZ_ERRNO;
-  }
-
-  if (lufread(buf, (uInt)size_to_read, 1, pfile_in_zip_read_info->file) != 1) {
-    return UNZ_ERRNO;
-  }
-
-  return (int)read_now;
-}
-
 //  Close the file in zip opened with unzipOpenCurrentFile
 //  Return UNZ_CRCERROR if all the file was read but the CRC is not good
 int unzCloseCurrentFile(unzFile file) {
@@ -3661,30 +3564,6 @@ int unzCloseCurrentFile(unzFile file) {
   s->pfile_in_zip_read = nullptr;
 
   return err;
-}
-
-//  Get the global comment string of the ZipFile, in the szComment buffer.
-//  uSizeBuf is the size of the szComment buffer.
-//  return the number of byte copied or an error code <0
-int unzGetGlobalComment(unzFile file, char *szComment,
-                        uLong uSizeBuf) {  // int err=UNZ_OK;
-  if (file == nullptr) return UNZ_PARAMERROR;
-
-  unz_s *s{file};
-  uLong uReadThis = uSizeBuf;
-
-  if (uReadThis > s->gi.size_comment) uReadThis = s->gi.size_comment;
-  if (lufseek(s->file, s->central_pos + 22, SEEK_SET) != 0) return UNZ_ERRNO;
-  if (uReadThis > 0) {
-    *szComment = '\0';
-
-    if (lufread(szComment, (uInt)uReadThis, 1, s->file) != 1) return UNZ_ERRNO;
-  }
-
-  if ((szComment != nullptr) && (uSizeBuf > s->gi.size_comment))
-    *(szComment + s->gi.size_comment) = '\0';
-
-  return (int)uReadThis;
 }
 
 int unzOpenCurrentFile(unzFile file, const char *password);
@@ -3910,7 +3789,7 @@ ZRESULT TUnzip::Get(int index, ZIPENTRY *ze) {
   bool readonly = (a & 0x00800000) == 0;
   // bool readable=  (a&0x01000000)!=0; // unused
   // bool executable=(a&0x00400000)!=0; // unused
-  bool hidden = false, system = false, archive = true;
+  [[maybe_unused]] bool hidden = false, system = false, archive = true;
   // but in normal hostmodes these are overridden by the lower half...
   int host = ufi.version >> 8;
   if (host == 0 || host == 7 || host == 11 || host == 14) {
@@ -3920,11 +3799,6 @@ ZRESULT TUnzip::Get(int index, ZIPENTRY *ze) {
     isdir = (a & 0x00000010) != 0;
     archive = (a & 0x00000020) != 0;
   }
-  readonly;
-  hidden;
-  system;
-  isdir;
-  archive;
   ze->attr = 0;
 
 #ifdef ZIP_STD
@@ -4087,7 +3961,6 @@ ZRESULT EnsureDirectory(const TCHAR *rootdir, const TCHAR *dir) {
     c++;
   }
 
-  const TCHAR *name{lastslash};
   if (lastslash != dir) {
     TCHAR tmp[MAX_PATH];
     memcpy(tmp, dir, sizeof(TCHAR) * (lastslash - dir));
@@ -4095,8 +3968,6 @@ ZRESULT EnsureDirectory(const TCHAR *rootdir, const TCHAR *dir) {
 
     ZRESULT rc = EnsureDirectory(rootdir, tmp);
     if (rc != ZR_OK) return rc;
-
-    name++;
   }
 
   TCHAR cd[MAX_PATH];
@@ -4488,16 +4359,19 @@ size_t FormatZipMessageU(ZRESULT code, TCHAR *buf, size_t len) {
     case ZR_FLATE:
       msg = _T("Zip-bug: an internal error during flation");
       break;
+    default:
+      // Use default one.
+      break;
   }
 
   const size_t mlen{_tcslen(msg)};
-  if (buf == 0 || len == 0) return mlen;
 
-  size_t n{mlen};
-  if (n + 1 > len) n = len - 1;
+  if (buf == nullptr || len == 0 || mlen > len - 1) {
+    return mlen;
+  }
 
-  _tcsncpy(buf, msg, n);
-  buf[n] = 0;
+  _tcscpy(buf, msg);
+  buf[mlen] = '\0';
 
   return mlen;
 }

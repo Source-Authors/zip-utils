@@ -611,8 +611,7 @@ int main() {
       }
       TCHAR absfn[MAX_PATH];
       wsprintf(absfn, _T("\\z\\%s"), ze.name);
-      if ((ze.attr & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
-          !fsame<msg>(_T("\\z\\folders.txt"), absfn)) {
+      if (!IsDirectory(ze) && !fsame<msg>(_T("\\z\\folders.txt"), absfn)) {
         wsprintf(m, _T("* Failed to unzip all of item %i of folders.zip"), i);
         msg(m);
       }

@@ -68,7 +68,9 @@
 #include <cstdio>
 #include <ctime>
 using HZIP__ = struct HZIP__;
-// An HZIP identifies a zip file that is being created.
+/**
+ * @brief An HZIP identifies a zip file that is being created.
+ */
 using HZIP = struct HZIP__ *;
 #ifndef MAX_PATH
 #define MAX_PATH 1024
@@ -81,7 +83,9 @@ typedef FILETIME ZIP_FILETIME;
 #else
 #define MAX_PATH 260
 using HZIP__ = struct HZIP__;
-// An HZIP identifies a zip file that is being created.
+/**
+ * @brief An HZIP identifies a zip file that is being created.
+ */
 using HZIP = struct HZIP__ *;
 typedef unsigned long DWORD;
 
@@ -92,7 +96,10 @@ typedef char TCHAR;
 #endif
 
 typedef void *HANDLE;
-// Actually typedef for FILETIME on Windows.
+
+/**
+ * @brief Actually typedef for FILETIME on Windows.
+ */
 struct ZIP_FILETIME {
   DWORD dwLowDateTime;
   DWORD dwHighDateTime;
@@ -138,14 +145,26 @@ struct ZIP_FILETIME {
 
 #ifdef ZU_UNZIP_BUILD_SHARED
 #ifdef ZU_UNZIP_BUILD_ITSELF
+/*
+ * @brief Export shared objects.
+ */
 #define ZU_UNZIP_ATTRIBUTE_SHARED ZU_UNZIP_ATTRIBUTE_SHARED_EXPORT
 #else
+/*
+ * @brief Import shared objects.
+ */
 #define ZU_UNZIP_ATTRIBUTE_SHARED ZU_UNZIP_ATTRIBUTE_SHARED_IMPORT
 #endif
 #else
+/*
+ * @brief Nothing for static library.
+ */
 #define ZU_UNZIP_ATTRIBUTE_SHARED
 #endif
 
+/**
+ * @brief Zip archive entry.
+ */
 struct ZIPENTRY {
   int index;                         // index of this file within the zip
   TCHAR name[MAX_PATH];              // filename within the zip
@@ -187,8 +206,8 @@ ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] HZIP OpenZipHandle(
 // information about the whole zipfile (and in particular ze.  Index returns the
 // number of index items).
 //
-// NOTE: the item might be a directory (ze.attr & FILE_ATTRIBUTE_DIRECTORY). See
-// below for notes on what happens when you unzip such an item.
+// NOTE: the item might be a directory (ze.attr & FILE_ATTRIBUTE_DIRECTORY).
+// See below for notes on what happens when you unzip such an item.
 // NOTE: if you are opening the zip through a pipe, then random access is not
 // possible and GetZipItem(-1) fails and you can't discover the number of items
 // except by calling GetZipItem on each one of them in turn, starting at 0,
@@ -264,7 +283,7 @@ ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] bool IsZipHandleU(HZIP hz);
 #ifdef ZIP_UTILS_XZIP_H_
 #undef CloseZip
 // CloseZip - the zip handle must be closed with this function.
-inline [[nodiscard]] ZRESULT CloseZip(HZIP hz) {
+[[nodiscard]] inline ZRESULT CloseZip(HZIP hz) {
   return IsZipHandleU(hz) ? CloseZipU(hz) : CloseZipZ(hz);
 }
 #else

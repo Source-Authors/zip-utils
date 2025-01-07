@@ -2,7 +2,7 @@
 #
 # See https://www.wischik.com/lu/programmer/zip_utils.html
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 project(zip-utils LANGUAGES CXX)
 
 # BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to make
@@ -259,16 +259,16 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   endif (ZU_ENABLE_ASAN)
 
   if (ZU_ENABLE_STATIC_MSVC_RUNTIME)
-  # Use static runtime.
-  foreach(flag_var
-      CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
-      CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
-      CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-      CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-    if (${flag_var} MATCHES "/MD")
-      string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-    endif()
-  endforeach()
+    # Use static runtime.
+    foreach(flag_var
+        CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+        CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+        CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+      if (${flag_var} MATCHES "/MD")
+        string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+      endif()
+    endforeach()
   endif (ZU_ENABLE_STATIC_MSVC_RUNTIME)
 else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   # Use -Wall for clang and gcc.
@@ -373,20 +373,20 @@ endif(BUILD_SHARED_LIBS)
 if (ZU_ENABLE_UNIT_TESTS)
   enable_testing()
 
-add_subdirectory(examples/modify)
+  add_subdirectory(examples/modify)
   add_test(NAME zip-utils-modify COMMAND zip-utils-modify)
 
-if (ZIP_UTILS_OS_WIN)
-  add_subdirectory(examples/progress)
+  if (ZIP_UTILS_OS_WIN)
+    add_subdirectory(examples/progress)
     add_test(NAME zip-utils-progress COMMAND zip-utils-progress)
-endif (ZIP_UTILS_OS_WIN)
 
-add_subdirectory(examples/simple)
-  add_test(NAME zip-utils-simple COMMAND zip-utils-simple)
+    add_subdirectory(examples/simple)
+    add_test(NAME zip-utils-simple COMMAND zip-utils-simple)
 
-add_subdirectory(examples/std)
+    add_subdirectory(examples/test)
+    add_test(NAME zip-utils-test COMMAND zip-utils-test)
+  endif (ZIP_UTILS_OS_WIN)
+
+  add_subdirectory(examples/std)
   add_test(NAME zip-utils-std COMMAND zip-utils-std)
-
-add_subdirectory(examples/test)
-  add_test(NAME zip-utils-test COMMAND zip-utils-test)
 endif (ZU_ENABLE_UNIT_TESTS)

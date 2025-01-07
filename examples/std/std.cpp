@@ -1,8 +1,6 @@
-﻿#include <direct.h>
-
-#include <cstdio>
-#include <memory>
+﻿#include <memory>
 #include <new>
+#include <string_view>
 
 #include "../../XUnzip.h"
 #include "../../XZip.h"

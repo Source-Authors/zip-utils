@@ -1,8 +1,11 @@
 ﻿#ifndef ZU_UTILS_EXAMPLES_TEST_UTILS_H_
 #define ZU_UTILS_EXAMPLES_TEST_UTILS_H_
 
-#include <cstdio>
+#include <sys/stat.h>
+
 #include <cstdlib>
+#include <cstring>
+#include <iostream>
 #include <memory>
 #include <new>
 
@@ -11,6 +14,14 @@
 
 #ifndef ZIP_STD
 #include <Windows.h>
+#endif
+
+#if defined(_MSC_VER) || defined(__BORLANDC__) || defined(__MINGW32__)
+#include <direct.h>
+#define zumkdir(t) (mkdir(t))
+#else
+#include <unistd.h>
+#define zumkdir(t) (mkdir(t, 0755))
 #endif
 
 namespace zu_utils::examples {
@@ -22,9 +33,9 @@ void msg(const char *s) {
   if (s[0] == '*') any_errors = true;
 
   if (!any_errors)
-    printf("%s\n", s);
+    std::cout << s << '\n';
   else
-    fprintf(stderr, "%s\n", s);
+    std::cerr << s << '\n';
 
 #ifndef ZIP_STD
   OutputDebugString(s);
@@ -32,7 +43,15 @@ void msg(const char *s) {
 #endif
 }
 
-template<void msg(const char *s)>
+constexpr bool IsDirectory(const ZIPENTRY &ze) noexcept {
+#ifndef ZIP_STD
+  return ze.attr & FILE_ATTRIBUTE_DIRECTORY;
+#else
+  return ze.attr & S_IFDIR;
+#endif
+}
+
+template <void msg(const char *s)>
 struct FileDeleter {
   void operator()(FILE *f) const noexcept {
     if (fclose(f)) {

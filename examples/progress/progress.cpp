@@ -215,7 +215,7 @@ INT_PTR CALLBACK ZipDialogProc(HWND hwnd, UINT msg,
 }
 
 DWORD WINAPI ZipThreadProc(void *) {
-  SetThreadDescription(::GetCurrentThread(), L"Zip write thread");
+  SetThreadDescription(GetCurrentThread(), L"Zip write thread");
 
   constexpr unsigned size = 64 * 1024 * 1024;  // 64mb big!
 

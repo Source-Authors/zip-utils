@@ -245,7 +245,7 @@ ZU_ZIP_ATTRIBUTE_SHARED [[nodiscard]] bool IsZipHandleZ(HZIP hz);
 #ifdef ZIP_UTILS_XUNZIP_H_
 #undef CloseZip
 // CloseZip - the zip handle must be closed with this function.
-inline [[nodiscard]] ZRESULT CloseZip(HZIP hz) {
+[[nodiscard]] inline ZRESULT CloseZip(HZIP hz) {
   return IsZipHandleZ(hz) ? CloseZipZ(hz) : CloseZipU(hz);
 }
 #else

@@ -66,9 +66,9 @@ ZRESULT AddFileToZip(const TCHAR *zipfn, const TCHAR *zename,
       if (zr != ZR_OK) return zr;
 
       // don't copy over the old version of the file we're changing
-      if (stricmp(ze.name, zename) == 0) continue;
+      if (strcmp(ze.name, zename) == 0) continue;
 
-      if (ze.attr & FILE_ATTRIBUTE_DIRECTORY) {
+      if (IsDirectory(ze)) {
         zr = ZipAddFolder(hzdst.get(), ze.name);
         if (zr != ZR_OK) return zr;
 
@@ -79,7 +79,7 @@ ZRESULT AddFileToZip(const TCHAR *zipfn, const TCHAR *zename,
         buf.reset(nullptr);
 
         bufsize = ze.unc_size * 2;
-        buf = std::move(std::make_unique<char[]>(bufsize));
+        buf = std::make_unique<char[]>(bufsize);
       }
 
       zr = UnzipItem(hzsrc.get(), i, buf.get(), ze.unc_size);
@@ -136,7 +136,7 @@ int main() {
       "remove from it.");
 
   // First we'll create some small files
-  if (!CreateDirectory("\\z", 0) && GetLastError() != ERROR_ALREADY_EXISTS) {
+  if (zumkdir("\\z") == -1 && errno != EEXIST) {
     msg("* Failed to create directory \\z");
   }
 
