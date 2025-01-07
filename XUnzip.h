@@ -103,6 +103,8 @@ struct ZIP_FILETIME {
 };
 #endif
 
+#include <cstddef>  // size_t
+
 #include "XZresult.h"
 
 #if defined(_MSC_VER)

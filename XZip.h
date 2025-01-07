@@ -97,6 +97,8 @@ typedef char TCHAR;
 typedef void *HANDLE;
 #endif
 
+#include <cstddef>  // size_t
+
 #include "XZresult.h"
 
 #if defined(_MSC_VER)
