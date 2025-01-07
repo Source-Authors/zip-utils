@@ -67,6 +67,7 @@
 #ifdef ZIP_STD
 #include <cstdio>
 #include <ctime>
+using HZIP__ = struct HZIP__;
 // An HZIP identifies a zip file that is being created.
 using HZIP = struct HZIP__ *;
 #ifndef MAX_PATH
@@ -79,6 +80,7 @@ typedef time_t FILETIME;
 typedef FILETIME ZIP_FILETIME;
 #else
 #define MAX_PATH 260
+using HZIP__ = struct HZIP__;
 // An HZIP identifies a zip file that is being created.
 using HZIP = struct HZIP__ *;
 typedef unsigned long DWORD;
@@ -170,10 +172,12 @@ struct ZIPENTRY {
 // NOTE: for windows-ce, you cannot close the handle until after CloseZip.  But
 // for real windows, the zip makes its own copy of your handle, so you can close
 // yours anytime.
-ZU_UNZIP_ATTRIBUTE_SHARED HZIP OpenZip(const TCHAR *fn, const char *password);
-ZU_UNZIP_ATTRIBUTE_SHARED HZIP OpenZip(void *z, unsigned int len,
-                                       const char *password);
-ZU_UNZIP_ATTRIBUTE_SHARED HZIP OpenZipHandle(HANDLE h, const char *password);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] HZIP OpenZip(const TCHAR *fn,
+                                                     const char *password);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] HZIP OpenZip(void *z, unsigned int len,
+                                                     const char *password);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] HZIP OpenZipHandle(
+    HANDLE h, const char *password);
 
 // GetZipItem - call this to get information about an item in the zip.
 //
@@ -190,16 +194,18 @@ ZU_UNZIP_ATTRIBUTE_SHARED HZIP OpenZipHandle(HANDLE h, const char *password);
 // through a pipe and the zip was itself created into a pipe, then then
 // comp_size and sometimes unc_size as well may not be known until after the
 // item has been unzipped.
-ZU_UNZIP_ATTRIBUTE_SHARED ZRESULT GetZipItem(HZIP hz, int index, ZIPENTRY *ze);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] ZRESULT GetZipItem(HZIP hz, int index,
+                                                           ZIPENTRY *ze);
 
 // FindZipItem - finds an item by name.
 //
 // ic means 'insensitive to case'.  It returns the index of the item, and
 // returns information about it.  If nothing was found, then index is set to -1
 // and the function returns an error code.
-ZU_UNZIP_ATTRIBUTE_SHARED ZRESULT FindZipItem(HZIP hz, const TCHAR *name,
-                                              bool ic, int *index,
-                                              ZIPENTRY *ze);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] ZRESULT FindZipItem(HZIP hz,
+                                                            const TCHAR *name,
+                                                            bool ic, int *index,
+                                                            ZIPENTRY *ze);
 
 // UnzipItem - given an index to an item, unzips it.
 //
@@ -220,15 +226,19 @@ ZU_UNZIP_ATTRIBUTE_SHARED ZRESULT FindZipItem(HZIP hz, const TCHAR *name,
 // directory with ZIP_FILENAME, then the directory gets created.  If you unzip
 // it to a handle or a memory block, then nothing gets created and it emits 0
 // bytes.
-ZU_UNZIP_ATTRIBUTE_SHARED ZRESULT UnzipItem(HZIP hz, int index,
-                                            const TCHAR *fn);
-ZU_UNZIP_ATTRIBUTE_SHARED ZRESULT UnzipItem(HZIP hz, int index, void *z,
-                                            unsigned int len);
-ZU_UNZIP_ATTRIBUTE_SHARED ZRESULT UnzipItemHandle(HZIP hz, int index, HANDLE h);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] ZRESULT UnzipItem(HZIP hz, int index,
+                                                          const TCHAR *fn);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] ZRESULT UnzipItem(HZIP hz, int index,
+                                                          void *z,
+                                                          unsigned int len);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] ZRESULT UnzipItemHandle(HZIP hz,
+                                                                int index,
+                                                                HANDLE h);
 
 // If unzipping to a filename, and it's a relative filename, then it will be
 // relative to here.  (defaults to current-directory).
-ZU_UNZIP_ATTRIBUTE_SHARED ZRESULT SetUnzipBaseDir(HZIP hz, const TCHAR *dir);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] ZRESULT SetUnzipBaseDir(
+    HZIP hz, const TCHAR *dir);
 
 // Now we indulge in a little skullduggery so that the code works whether the
 // user has included just zip or both zip and unzip.
@@ -237,7 +247,7 @@ ZU_UNZIP_ATTRIBUTE_SHARED ZRESULT SetUnzipBaseDir(HZIP hz, const TCHAR *dir);
 // cpp files for zip and unzip are both present, so we will call one or the
 // other of them based on a dynamic choice.  If the header file for only one is
 // present, then we will bind to that particular one.
-ZU_UNZIP_ATTRIBUTE_SHARED ZRESULT CloseZipU(HZIP hz);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] ZRESULT CloseZipU(HZIP hz);
 
 // FormatZipMessage - given an error code, formats it as a string.
 //
@@ -247,12 +257,12 @@ ZU_UNZIP_ATTRIBUTE_SHARED size_t FormatZipMessageU(ZRESULT code, TCHAR *buf,
                                                    size_t len);
 
 // IsZipHandleU - is handle unzip one.
-ZU_UNZIP_ATTRIBUTE_SHARED bool IsZipHandleU(HZIP hz);
+ZU_UNZIP_ATTRIBUTE_SHARED [[nodiscard]] bool IsZipHandleU(HZIP hz);
 
 #ifdef ZIP_UTILS_XZIP_H_
 #undef CloseZip
 // CloseZip - the zip handle must be closed with this function.
-inline ZRESULT CloseZip(HZIP hz) {
+inline [[nodiscard]] ZRESULT CloseZip(HZIP hz) {
   return IsZipHandleU(hz) ? CloseZipU(hz) : CloseZipZ(hz);
 }
 #else

@@ -29,15 +29,7 @@ add_executable(${PACKAGE_NAME}
   ${ZIP_UTILS_ROOT_DIR}/build/win/resource_scripts/windows_app_base.rc
 )
 
-if (BUILD_SHARED_LIBS)
-  target_link_libraries(${PACKAGE_NAME} zip-utils)
-else ()
-  target_sources(${PACKAGE_NAME}
-    PRIVATE
-      ${ZIP_UTILS_ROOT_DIR}/XZip.cpp
-      ${ZIP_UTILS_ROOT_DIR}/XUnzip.cpp
-  )
-endif (BUILD_SHARED_LIBS)
+target_link_libraries(${PACKAGE_NAME} zip-utils)
 
 target_include_directories(${PACKAGE_NAME}
   PRIVATE

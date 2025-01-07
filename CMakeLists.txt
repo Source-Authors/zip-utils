@@ -9,7 +9,13 @@ project(zip-utils LANGUAGES CXX)
 # it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
-option(ZU_ENABLE_ASAN "Build with AddressSanitizer" OFF)
+option(ZU_ENABLE_STATIC_MSVC_RUNTIME "Build with static MSVC runtime." ON)
+
+# Use Address Sanitizer.
+option(ZU_ENABLE_ASAN "Build with Address Sanitizer." OFF)
+
+# Use unit tests.
+option(ZU_ENABLE_UNIT_TESTS "Build and run unit-tests." ON)
 
 # Compiler id for Apple Clang is now AppleClang.
 if (POLICY CMP0025)
@@ -236,10 +242,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")
 
   if (ZU_ENABLE_ASAN)
+    message(STATUS "[options]: ASAN enabled.")
+
     # Use AddressSanitizer.
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /fsanitize=address")
   endif (ZU_ENABLE_ASAN)
 
+  if (ZU_ENABLE_STATIC_MSVC_RUNTIME)
   # Use static runtime.
   foreach(flag_var
       CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
@@ -250,6 +259,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
       string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
     endif()
   endforeach()
+  endif (ZU_ENABLE_STATIC_MSVC_RUNTIME)
 else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   # Use -Wall for clang and gcc.
   if(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
@@ -277,6 +287,8 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
   
   if (ZU_ENABLE_ASAN)
+    message(STATUS "[options]: ASAN enabled.")
+
     # Use AddressSanitizer.
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
   endif (ZU_ENABLE_ASAN)
@@ -298,6 +310,11 @@ target_sources(${PACKAGE_NAME}
 target_include_directories(${PACKAGE_NAME}
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
+)
+
+target_compile_definitions(${PACKAGE_NAME}
+  PRIVATE
+    _CRT_SECURE_NO_WARNINGS=1
 )
 
 set_target_properties(${PACKAGE_NAME}
@@ -343,12 +360,23 @@ if (BUILD_SHARED_LIBS)
   endif (ZIP_UTILS_OS_WIN)
 endif(BUILD_SHARED_LIBS)
 
+if (ZU_ENABLE_UNIT_TESTS)
+  enable_testing()
+
 add_subdirectory(examples/modify)
+  add_test(NAME zip-utils-modify COMMAND zip-utils-modify)
 
 if (ZIP_UTILS_OS_WIN)
   add_subdirectory(examples/progress)
+    add_test(NAME zip-utils-progress COMMAND zip-utils-progress)
 endif (ZIP_UTILS_OS_WIN)
 
 add_subdirectory(examples/simple)
+  add_test(NAME zip-utils-simple COMMAND zip-utils-simple)
+
 add_subdirectory(examples/std)
+  add_test(NAME zip-utils-std COMMAND zip-utils-std)
+
 add_subdirectory(examples/test)
+  add_test(NAME zip-utils-test COMMAND zip-utils-test)
+endif (ZU_ENABLE_UNIT_TESTS)

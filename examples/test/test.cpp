@@ -1,65 +1,32 @@
-﻿#include <tchar.h>
+﻿// This program runs a bunch of test cases on zip/unzip.
+//
+// Most of the test cases come from bugs that had been reported in an earlier
+// version of the ziputils, to be sure that they're fixed.
+
+#include <tchar.h>
 #include <windows.h>
 
 #include <cstdio>
 #include <memory>
 #include <vector>
 
-#include "../../XUnzip.h"
-#include "../../XZip.h"
+#include "../test_utils.h"
+#include "XUnzip.h"
+#include "XZip.h"
 
-// This program runs a bunch of test cases on zip/unzip.
-// Most of the test cases come from bugs that had been reported
-// in an earlier version of the ziputils, to be sure that they're fixed.
+using namespace zu_utils::examples;
 
-bool tsame(const FILETIME t0, const FILETIME t1) {
+using zip_ptr = std::unique_ptr<HZIP__, ZipDeleter<msg>>;
+
+namespace {
+
+bool tsame(const FILETIME t0, const FILETIME t1) noexcept {
   if (t0.dwHighDateTime != t1.dwHighDateTime) return false;
   if ((t0.dwLowDateTime >> 28) != (t1.dwLowDateTime >> 28)) return false;
-  return true;
-  // we allow some flexibility in the lower bits. That's because zip's don't
+
+  // We allow some flexibility in the lower bits.  That's because zip's don't
   // store times with as much precision.
-}
-
-bool fsame(const TCHAR *fn0, const TCHAR *fn1) {
-  HANDLE hf0 = CreateFile(fn0, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING,
-                          FILE_FLAG_SEQUENTIAL_SCAN, 0);
-  HANDLE hf1 = CreateFile(fn1, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING,
-                          FILE_FLAG_SEQUENTIAL_SCAN, 0);
-  if (hf0 == INVALID_HANDLE_VALUE || hf1 == INVALID_HANDLE_VALUE) {
-    if (hf0 != INVALID_HANDLE_VALUE) CloseHandle(hf0);
-    if (hf1 != INVALID_HANDLE_VALUE) CloseHandle(hf1);
-    return false;
-  }
-  LARGE_INTEGER size0, size1;
-  if (!GetFileSizeEx(hf0, &size0) || !GetFileSizeEx(hf1, &size1) ||
-      size0.QuadPart != size1.QuadPart) {
-    CloseHandle(hf0);
-    CloseHandle(hf1);
-    return false;
-  }
-  LONGLONG size = size0.QuadPart;
-  //
-  constexpr int readsize = 65535;
-  std::unique_ptr<char[]> buf0 = std::make_unique<char[]>(readsize);
-  std::unique_ptr<char[]> buf1 = std::make_unique<char[]>(readsize);
-  LONGLONG done = 0;
-  while (done < size) {
-    LONGLONG left = size - done;
-
-    if (left > readsize) left = readsize;
-
-    DWORD read;
-    if (!ReadFile(hf0, buf0.get(), static_cast<DWORD>(left), &read, 0) ||
-        !ReadFile(hf1, buf1.get(), static_cast<DWORD>(left), &read, 0))
-      break;
-
-    if (memcmp(buf0.get(), buf1.get(), read) != 0) break;
-
-    done += left;
-  }
-  CloseHandle(hf0);
-  CloseHandle(hf1);
-  return (done == size);
+  return true;
 }
 
 BOOL SaveResource(const TCHAR *res, const TCHAR *fn) {
@@ -73,61 +40,24 @@ BOOL SaveResource(const TCHAR *res, const TCHAR *fn) {
   if (!hglob) return FALSE;
 
   void *buf = LockResource(hglob);
-  unsigned int len = SizeofResource(hInstance, hrsrc);
-  HANDLE hf =
-      CreateFile(fn, GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
-                 FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                     FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                 0);
+  const DWORD len = SizeofResource(hInstance, hrsrc);
+  handle_ptr<msg> hf{CreateFile(fn, GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+                                FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+                                    FILE_FLAG_BACKUP_SEMANTICS |
+                                    FILE_FLAG_SEQUENTIAL_SCAN,
+                                0)};
   if (!hf) return FALSE;
 
   DWORD writ;
-  BOOL ok = WriteFile(hf, buf, len, &writ, 0);
-  CloseHandle(hf);
-
-  return ok;
+  return WriteFile(hf.get(), buf, len, &writ, 0);
 }
 
-bool any_errors = false;
-bool p_abort = false;
-void msg(const TCHAR *s) {
-  if (s[0] == '*') any_errors = true;
-#ifdef UNDER_CE
-  int res = IDOK;
-  if (s[0] == '*')
-    res = MessageBox(0, s, _T("Zip error"), MB_ICONERROR | MB_OKCANCEL);
-  else if (s[0] == '.')
-    MessageBeep(0);
-  else
-    MessageBox(0, s, _T("Zip test"), MB_OKCANCEL);
-  if (res == IDCANCEL) p_abort = true;
-#else
-
-  if (!any_errors)
-    _tprintf(_T("%s\n"), s);
-  else
-    _ftprintf(stderr, _T("%s\n"), s);
-
-#ifdef _WIN32
-  OutputDebugString(s);
-  OutputDebugString(_T("\n"));
-#endif
-#endif
-}
+}  // namespace
 
 int main() {
-  HZIP hz;
   DWORD writ;
-  ZRESULT zr;
   ZIPENTRY ze;
   TCHAR m[1024];
-  bool fast = false;
-#ifdef UNDER_CE
-  fast = true;
-#endif
-#ifdef __CODEGUARD__
-  fast = true;
-#endif
 
   msg(_T("Zip-utils tests. Files will be left in \"\\z\""));
   if (!CreateDirectory(_T("\\z"), 0) &&
@@ -146,9 +76,9 @@ int main() {
   // fixed bug: OpenZip errors and returns0 when you try to open a zip with no
   // files in it
   msg(_T("empty - testing whether it fails to open empty zipfiles"));
-  hz = CreateZip(_T("\\z\\empty.zip"), 0);
+  HZIP hz = CreateZip(_T("\\z\\empty.zip"), 0);
   if (hz == 0) msg(_T("* Failed to create empty.zip"));
-  zr = CloseZip(hz);
+  ZRESULT zr = CloseZip(hz);
   if (zr != ZR_OK) msg(_T("* Failed to close empty.zip"));
   if (p_abort) return 1;
   hz = OpenZip(_T("\\z\\empty.zip"), 0);
@@ -161,6 +91,7 @@ int main() {
 
   // fixed bug: IsZipHandle should return false for a NULL handle.
   msg(_T("IsZipHandle - testing whether 0 is considered a handle"));
+
   bool b = IsZipHandleZ(0) || IsZipHandleU(0);
   if (b) msg(_T("IsZipHandle failed to deny handlehood of NULL"));
   if (p_abort) return 1;
@@ -185,57 +116,62 @@ int main() {
   {
     std::vector<char> c;
     c.reserve(200U * 1024);
-    for (int i = 0; i < 200 * 1024; i++) c.emplace_back((char)(rand() % 255));
+    for (size_t i = 0; i < c.capacity(); i++)
+      c.emplace_back((char)(rand() % 255));
 
-    HANDLE hf =
-        CreateFile(_T("\\z\\sizes-71k.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
-                   FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                   0);
-    if (!hf) msg(_T("* Failed to create \\z\\sizes-71k.dat"));
+    {
+      handle_ptr<msg> hf{CreateFile(
+          _T("\\z\\sizes-71k.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+          FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+          0)};
+      if (!hf) msg(_T("* Failed to create \\z\\sizes-71k.dat"));
 
-    if (!WriteFile(hf, c.data(), 71 * 1024, &writ, 0)) {
-      msg(_T("* Failed to write \\z\\sizes-71k.dat"));
+      if (!WriteFile(hf.get(), c.data(), 71 * 1024, &writ, 0)) {
+        msg(_T("* Failed to write \\z\\sizes-71k.dat"));
+      }
     }
 
-    CloseHandle(hf);
-    hf = CreateFile(_T("\\z\\sizes-152_2k.dat"), GENERIC_WRITE, 0, 0,
-                    CREATE_ALWAYS,
-                    FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                    0);
-    if (!hf) msg(_T("* Failed to create \\z\\sizes-152_2k.dat"));
+    {
+      handle_ptr<msg> hf{CreateFile(
+          _T("\\z\\sizes-152_2k.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+          FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+          0)};
+      if (!hf) msg(_T("* Failed to create \\z\\sizes-152_2k.dat"));
 
-    if (!WriteFile(hf, c.data(), 152 * 1024 + 1024 / 5, &writ, 0)) {
-      msg(_T("* Failed to write \\z\\sizes-152_2k.dat"));
+      if (!WriteFile(hf.get(), c.data(), 152 * 1024 + 1024 / 5, &writ, 0)) {
+        msg(_T("* Failed to write \\z\\sizes-152_2k.dat"));
+      }
     }
 
-    CloseHandle(hf);
-    hf = CreateFile(_T("\\z\\sizes-145b.dat"), GENERIC_WRITE, 0, 0,
-                    CREATE_ALWAYS,
-                    FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                    0);
-    if (!hf) msg(_T("* Failed to create \\z\\sizes-145b.dat"));
+    {
+      handle_ptr<msg> hf{CreateFile(
+          _T("\\z\\sizes-145b.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+          FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+          0)};
+      if (!hf) msg(_T("* Failed to create \\z\\sizes-145b.dat"));
 
-    if (!WriteFile(hf, c.data(), 145, &writ, 0)) {
-      msg(_T("* Failed to write \\z\\sizes-145b.dat"));
+      if (!WriteFile(hf.get(), c.data(), 145, &writ, 0)) {
+        msg(_T("* Failed to write \\z\\sizes-145b.dat"));
+      }
     }
 
-    CloseHandle(hf);
-    hf = CreateFile(_T("\\z\\sizes-120k.dat"), GENERIC_WRITE, 0, 0,
-                    CREATE_ALWAYS,
-                    FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                    0);
-    if (!hf) msg(_T("* Failed to create \\z\\sizes-120k.dat"));
+    {
+      handle_ptr<msg> hf{CreateFile(
+          _T("\\z\\sizes-120k.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+          FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+          0)};
+      if (!hf) msg(_T("* Failed to create \\z\\sizes-120k.dat"));
 
-    if (!WriteFile(hf, c.data(), 120 * 1024, &writ, 0)) {
-      msg(_T("* Failed to write \\z\\sizes-120k.dat"));
+      if (!WriteFile(hf.get(), c.data(), 120 * 1024, &writ, 0)) {
+        msg(_T("* Failed to write \\z\\sizes-120k.dat"));
+      }
     }
-
-    CloseHandle(hf);
   }
+
   //
   hz = CreateZip(_T("\\z\\sizes.zip"), 0);
   if (hz == 0) msg(_T("* Failed to create sizes.zip"));
@@ -254,19 +190,19 @@ int main() {
   if (hz == 0) msg(_T("* Failed to open sizes.zip"));
   zr = UnzipItem(hz, 0, _T("\\z\\sizes-71k.out.dat"));
   if (zr != ZR_OK) msg(_T("* Failed to unzip 71k"));
-  if (!fsame(_T("\\z\\sizes-71k.dat"), _T("\\z\\sizes-71k.out.dat")))
+  if (!fsame<msg>(_T("\\z\\sizes-71k.dat"), _T("\\z\\sizes-71k.out.dat")))
     msg(_T("* Failed to unzip all of 71k"));
   zr = UnzipItem(hz, 1, _T("\\z\\sizes-152_2k.out.dat"));
   if (zr != ZR_OK ||
-      !fsame(_T("\\z\\sizes-152_2k.dat"), _T("\\z\\sizes-152_2k.out.dat")))
+      !fsame<msg>(_T("\\z\\sizes-152_2k.dat"), _T("\\z\\sizes-152_2k.out.dat")))
     msg(_T("* Failed to unzip 152_2k"));
   zr = UnzipItem(hz, 2, _T("\\z\\sizes-145b.out.dat"));
   if (zr != ZR_OK ||
-      !fsame(_T("\\z\\sizes-145b.dat"), _T("\\z\\sizes-145b.out.dat")))
+      !fsame<msg>(_T("\\z\\sizes-145b.dat"), _T("\\z\\sizes-145b.out.dat")))
     msg(_T("* Failed to unzip 145b"));
   zr = UnzipItem(hz, 3, _T("\\z\\sizes-120k.out.dat"));
   if (zr != ZR_OK ||
-      !fsame(_T("\\z\\sizes-120k.dat"), _T("\\z\\sizes-120k.out.dat")))
+      !fsame<msg>(_T("\\z\\sizes-120k.dat"), _T("\\z\\sizes-120k.out.dat")))
     msg(_T("* Failed to unzip 120k"));
   zr = CloseZip(hz);
   if (zr != ZR_OK) msg(_T("* Failed to close sizes.zip"));
@@ -276,30 +212,32 @@ int main() {
     char c[67 * 1024];
     memset(c, 'a', sizeof(c));
 
-    HANDLE hf = CreateFile(
-        _T("\\z\\sizes2-67k1.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-        0);
-    if (!hf) msg(_T("* Failed to create \\z\\sizes2-67k1.dat"));
+    {
+      handle_ptr<msg> hf{CreateFile(
+          _T("\\z\\sizes2-67k1.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+          FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+          0)};
+      if (!hf) msg(_T("* Failed to create \\z\\sizes2-67k1.dat"));
 
-    if (!WriteFile(hf, c, 67 * 1024, &writ, 0)) {
-      msg(_T("* Failed to write \\z\\sizes2-67k1.dat"));
+      if (!WriteFile(hf.get(), c, 67 * 1024, &writ, 0)) {
+        msg(_T("* Failed to write \\z\\sizes2-67k1.dat"));
+      }
     }
 
-    CloseHandle(hf);
-    hf = CreateFile(_T("\\z\\sizes2-67k2.dat"), GENERIC_WRITE, 0, 0,
-                    CREATE_ALWAYS,
-                    FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                    0);
-    if (!hf) msg(_T("* Failed to create \\z\\sizes2-67k2.dat"));
+    {
+      handle_ptr<msg> hf{CreateFile(
+          _T("\\z\\sizes2-67k2.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+          FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+          0)};
+      if (!hf) msg(_T("* Failed to create \\z\\sizes2-67k2.dat"));
 
-    if (!WriteFile(hf, c, 67 * 1024, &writ, 0)) {
-      msg(_T("* Failed to write \\z\\sizes2-67k2.dat"));
+      if (!WriteFile(hf.get(), c, 67 * 1024, &writ, 0)) {
+        msg(_T("* Failed to write \\z\\sizes2-67k2.dat"));
+      }
     }
 
-    CloseHandle(hf);
     hz = CreateZip(_T("\\z\\sizes2.zip"), 0);
     if (hz == 0) msg(_T("* Failed to create sizes2.zip"));
     zr = ZipAdd(hz, _T("sizes2-67k1.out.dat"), _T("\\z\\sizes2-67k1.dat"));
@@ -313,11 +251,11 @@ int main() {
     if (hz == 0) msg(_T("* Failed to open sizes2.zip"));
     zr = UnzipItem(hz, 0, _T("\\z\\sizes2-67k1.out.dat"));
     if (zr != ZR_OK ||
-        !fsame(_T("\\z\\sizes2-67k1.dat"), _T("\\z\\sizes2-67k1.out.dat")))
+        !fsame<msg>(_T("\\z\\sizes2-67k1.dat"), _T("\\z\\sizes2-67k1.out.dat")))
       msg(_T("* Failed to unzip all of 67k1"));
     zr = UnzipItem(hz, 1, _T("\\z\\sizes2-67k2.out.dat"));
     if (zr != ZR_OK ||
-        !fsame(_T("\\z\\sizes2-67k2.dat"), _T("\\z\\sizes2-67k1.out.dat")))
+        !fsame<msg>(_T("\\z\\sizes2-67k2.dat"), _T("\\z\\sizes2-67k1.out.dat")))
       msg(_T("* Failed to unzip all of 67k2"));
     zr = CloseZip(hz);
     if (zr != ZR_OK) msg(_T("* Failed to close sizes2.zip"));
@@ -336,32 +274,34 @@ int main() {
   {
     std::vector<char> c;
     c.reserve(10240);
-    for (int i = 0; i < 10240; i++) c.emplace_back((char)(rand() % 255));
+    for (size_t i = 0; i < c.capacity(); i++)
+      c.emplace_back((char)(rand() % 255));
 
-    HANDLE hf = CreateFile(
-        _T("\\z\\unztomem-10k24.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-        0);
-    if (!hf) msg(_T("* Failed to create \\z\\unztomem-10k24.dat"));
+    {
+      handle_ptr<msg> hf{CreateFile(
+          _T("\\z\\unztomem-10k24.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+          FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+          0)};
+      if (!hf) msg(_T("* Failed to create \\z\\unztomem-10k24.dat"));
 
-    if (!WriteFile(hf, c.data(), 10240, &writ, 0)) {
-      msg(_T("* Failed to write \\z\\unztomem-10k24.dat"));
+      if (!WriteFile(hf.get(), c.data(), 10240, &writ, 0)) {
+        msg(_T("* Failed to write \\z\\unztomem-10k24.dat"));
+      }
     }
 
-    CloseHandle(hf);
-    hf = CreateFile(_T("\\z\\unztomem-10k00.dat"), GENERIC_WRITE, 0, 0,
-                    CREATE_ALWAYS,
-                    FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                    0);
-    if (!hf) msg(_T("* Failed to create \\z\\unztomem-10k00.dat"));
+    {
+      handle_ptr<msg> hf{CreateFile(
+          _T("\\z\\unztomem-10k00.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+          FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+          0)};
+      if (!hf) msg(_T("* Failed to create \\z\\unztomem-10k00.dat"));
 
-    if (!WriteFile(hf, c.data(), 10000, &writ, 0)) {
-      msg(_T("* Failed to write \\z\\unztomem-10k00.dat"));
+      if (!WriteFile(hf.get(), c.data(), 10000, &writ, 0)) {
+        msg(_T("* Failed to write \\z\\unztomem-10k00.dat"));
+      }
     }
-
-    CloseHandle(hf);
   }
 
   hz = CreateZip(_T("\\z\\unztomem.zip"), 0);
@@ -379,7 +319,9 @@ int main() {
     hz = OpenZip(_T("\\z\\unztomem.zip"), 0);
     if (hz == 0) msg(_T("* Failed to open unztomem.zip"));
 
-    GetZipItem(hz, 0, &ze);
+    zr = GetZipItem(hz, 0, &ze);
+    if (zr != ZR_OK) msg(_T("* Failed to get 0 zip item from unztomem.zip"));
+
     char buf[1024];
     zr = ZR_MORE;
     long totsize = 0;
@@ -400,7 +342,9 @@ int main() {
   {
     hz = OpenZip(_T("\\z\\unztomem.zip"), 0);
     if (hz == 0) msg(_T("* Failed to open unztomem.zip"));
-    GetZipItem(hz, 1, &ze);
+    zr = GetZipItem(hz, 1, &ze);
+    if (zr != ZR_OK) msg(_T("* Failed to get 1 zip item from unztomem.zip"));
+
     char buf[1024];
     zr = ZR_MORE;
     long totsize = 0;
@@ -447,29 +391,34 @@ int main() {
   // currently 8
   msg(_T("time - testing whether timestamps are preserved on CE"));
   {
-    TCHAR *c = _T("Time waits for no man\r\n");
-    HANDLE hf =
-        CreateFile(_T("\\z\\time.txt"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
-                   FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                   0);
-    if (!hf) msg(_T("* Failed to create \\z\\time.txt"));
+    {
+      constexpr TCHAR c[] = _T("Time waits for no man\r\n");
 
-    if (!WriteFile(hf, c, (DWORD)(_tcslen(c) * sizeof(TCHAR)), &writ, 0)) {
-      msg(_T("* Failed to write \\z\\time.txt"));
+      handle_ptr<msg> hf{
+          CreateFile(_T("\\z\\time.txt"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+                     FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+                     0)};
+      if (!hf) msg(_T("* Failed to create \\z\\time.txt"));
+
+      if (!WriteFile(hf.get(), c, (DWORD)(_tcslen(c) * sizeof(TCHAR)), &writ,
+                     0)) {
+        msg(_T("* Failed to write \\z\\time.txt"));
+      }
     }
-
-    CloseHandle(hf);
-
-    hf = CreateFile(_T("\\z\\time.txt"), GENERIC_READ, FILE_SHARE_READ, 0,
-                    OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0);
-    if (!hf) msg(_T("* Failed to read \\z\\time.txt"));
 
     BY_HANDLE_FILE_INFORMATION fi;
-    if (!GetFileInformationByHandle(hf, &fi)) {
-      msg(_T("* Failed to get info by handle to \\z\\time.txt"));
+    {
+      handle_ptr<msg> hf{CreateFile(_T("\\z\\time.txt"), GENERIC_READ,
+                                    FILE_SHARE_READ, 0, OPEN_EXISTING,
+                                    FILE_FLAG_SEQUENTIAL_SCAN, 0)};
+      if (!hf) msg(_T("* Failed to read \\z\\time.txt"));
+
+      if (!GetFileInformationByHandle(hf.get(), &fi)) {
+        msg(_T("* Failed to get info by handle to \\z\\time.txt"));
+      }
     }
-    CloseHandle(hf);
+
     hz = CreateZip(_T("\\z\\time.zip"), 0);
     if (hz == 0) msg(_T("* Failed to create hello.zip"));
     zr = ZipAdd(hz, _T("time.txt"), _T("\\z\\time.txt"));
@@ -509,39 +458,44 @@ int main() {
     zr = CloseZip(hz);
     if (zr != ZR_OK) msg(_T("* Failed to close extra.zip"));
     if (p_abort) return 1;
-    HANDLE hf = CreateFile(_T("\\z\\extra.txt"), GENERIC_READ, FILE_SHARE_READ,
-                           0, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0);
+
+    handle_ptr<msg> hf{CreateFile(_T("\\z\\extra.txt"), GENERIC_READ,
+                                  FILE_SHARE_READ, 0, OPEN_EXISTING,
+                                  FILE_FLAG_SEQUENTIAL_SCAN, 0)};
     if (!hf) msg(_T("* Failed to read \\z\\extra.txt"));
 
     LARGE_INTEGER size = {};
-    if (!GetFileSizeEx(hf, &size)) {
+    if (!GetFileSizeEx(hf.get(), &size)) {
       msg(_T("* Failed to get size of \\z\\extra.txt"));
     }
 
-    CloseHandle(hf);
     if (size.QuadPart != ze.unc_size)
       msg(_T("* Failed to unzip all of extra.txt"));
+
     if (p_abort) return 1;
   }
   {
-    TCHAR *c =
-        _T("Hello there this will have to be a very long file if I want to ")
-        _T("see what I want to see the quick brown fox jumped over the lazy ")
-        _T("dog and a merry time was had by all at the party few things are ")
-        _T("more distressing to a well-regulated mind than to see a boy who ")
-        _T("ought to know better disporting himself at improper moments\r\n");
-    HANDLE hf =
-        CreateFile(_T("\\z\\extrapp.txt"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
-                   FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                   0);
-    if (!hf) msg(_T("* Failed to write \\z\\extrapp.txt"));
+    {
+      constexpr TCHAR c[] =
+          _T("Hello there this will have to be a very long file if I want to ")
+          _T("see what I want to see the quick brown fox jumped over the lazy ")
+          _T("dog and a merry time was had by all at the party few things are ")
+          _T("more distressing to a well-regulated mind than to see a boy who ")
+          _T("ought to know better disporting himself at improper moments\r\n");
 
-    if (!WriteFile(hf, c, (DWORD)(_tcslen(c) * sizeof(TCHAR)), &writ, 0)) {
-      msg(_T("* Failed to write \\z\\extrapp.txt"));
+      handle_ptr<msg> hf{
+          CreateFile(_T("\\z\\extrapp.txt"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+                     FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+                     0)};
+      if (!hf) msg(_T("* Failed to write \\z\\extrapp.txt"));
+
+      if (!WriteFile(hf.get(), c, (DWORD)(_tcslen(c) * sizeof(TCHAR)), &writ,
+                     0)) {
+        msg(_T("* Failed to write \\z\\extrapp.txt"));
+      }
     }
 
-    CloseHandle(hf);
     hz = CreateZip(_T("\\z\\extrapp.zip"), "password");
     if (hz == 0) msg(_T("* Failed to create extrapp.zip"));
     zr = ZipAdd(hz, _T("extrapp.txt"), _T("\\z\\extrapp.txt"));
@@ -557,7 +511,7 @@ int main() {
     if (zr != ZR_OK) msg(_T("* Failed to unzip extrapp.txt"));
     zr = CloseZip(hz);
     if (zr != ZR_OK) msg(_T("* Failed to close extrapp.zip"));
-    if (!fsame(_T("\\z\\extrapp.txt"), _T("\\z\\extrapp.out.txt")))
+    if (!fsame<msg>(_T("\\z\\extrapp.txt"), _T("\\z\\extrapp.out.txt")))
       msg(_T("* Failed to unzip all of extrapp.txt"));
     if (p_abort) return 1;
   }
@@ -592,9 +546,9 @@ int main() {
     if (zr != ZR_OK) msg(_T("* Failed to unzip ce2ce.out.txt"));
     zr = CloseZip(hz);
     if (zr != ZR_OK) msg(_T("* Failed to close ce2ce.zip"));
-    if (!fsame(_T("\\z\\ce2ce.jpg"), _T("\\z\\ce2ce.out.jpg")))
+    if (!fsame<msg>(_T("\\z\\ce2ce.jpg"), _T("\\z\\ce2ce.out.jpg")))
       msg(_T("* Failed to unzip all of ce2ce.jpg"));
-    if (!fsame(_T("\\z\\ce2ce.txt"), _T("\\z\\ce2ce.out.txt")))
+    if (!fsame<msg>(_T("\\z\\ce2ce.txt"), _T("\\z\\ce2ce.out.txt")))
       msg(_T("* Failed to unzip all of ce2ce.txt"));
     if (p_abort) return 1;
   }
@@ -605,19 +559,21 @@ int main() {
   // never created!
   msg(_T("folders - testing whether unzip to subfolders works"));
   {
-    TCHAR *c = _T("Hello just a dummy file\r\n");
-    HANDLE hf =
-        CreateFile(_T("\\z\\folders.txt"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
-                   FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
-                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                   0);
-    if (!hf) msg(_T("* Failed to create \\z\\folders.txt"));
+    {
+      constexpr TCHAR c[] = _T("Hello just a dummy file\r\n");
+      handle_ptr<msg> hf{
+          CreateFile(_T("\\z\\folders.txt"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
+                     FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
+                     0)};
+      if (!hf) msg(_T("* Failed to create \\z\\folders.txt"));
 
-    if (!WriteFile(hf, c, (DWORD)(_tcslen(c) * sizeof(TCHAR)), &writ, 0)) {
-      msg(_T("* Failed to write \\z\\folders.txt"));
+      if (!WriteFile(hf.get(), c, (DWORD)(_tcslen(c) * sizeof(TCHAR)), &writ,
+                     0)) {
+        msg(_T("* Failed to write \\z\\folders.txt"));
+      }
     }
 
-    CloseHandle(hf);
     hz = CreateZip(_T("\\z\\folders.zip"), 0);
     if (hz == 0) msg(_T("* Failed to create folders.zip"));
     zr = ZipAdd(hz, _T("folders.out.txt"), _T("\\z\\folders.txt"));
@@ -656,7 +612,7 @@ int main() {
       TCHAR absfn[MAX_PATH];
       wsprintf(absfn, _T("\\z\\%s"), ze.name);
       if ((ze.attr & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
-          !fsame(_T("\\z\\folders.txt"), absfn)) {
+          !fsame<msg>(_T("\\z\\folders.txt"), absfn)) {
         wsprintf(m, _T("* Failed to unzip all of item %i of folders.zip"), i);
         msg(m);
       }
@@ -671,25 +627,23 @@ int main() {
   msg(_T("skip - testing whether it skips bytes when extracting big files... ")
       _T("(will take a while)"));
   {
-    DWORD size = (fast) ? 277606 : 27760609;
+    constexpr DWORD size = 27760609;
 
     std::vector<char> c;
     c.reserve(size);
     for (DWORD i = 0; i < size; i++) c.emplace_back((char)(rand() % 255));
 
     {
-      HANDLE hf =
+      handle_ptr<msg> hf{
           CreateFile(_T("\\z\\skip.dat"), GENERIC_WRITE, 0, 0, CREATE_ALWAYS,
                      FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
                          FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN,
-                     0);
+                     0)};
       if (!hf) msg(_T("* Failed to create \\z\\skip.dat"));
 
-      if (!WriteFile(hf, c.data(), size, &writ, 0)) {
+      if (!WriteFile(hf.get(), c.data(), size, &writ, 0)) {
         msg(_T("* Failed to write \\z\\skip.dat"));
       }
-
-      CloseHandle(hf);
     }
 
     //
@@ -706,7 +660,7 @@ int main() {
     if (zr != ZR_OK) msg(_T("* Failed to unzip skip.out.zip"));
     zr = CloseZip(hz);
     if (zr != ZR_OK) msg(_T("* Failed to close skip.zip"));
-    if (!fsame(_T("\\z\\skip.dat"), _T("\\z\\skip.out.dat")))
+    if (!fsame<msg>(_T("\\z\\skip.dat"), _T("\\z\\skip.out.dat")))
       msg(_T("* Failed to unzip all of skip.zip"));
     if (p_abort) return 1;
   }
@@ -747,7 +701,7 @@ int main() {
   }
 
   LONGLONG tot = 0;
-  DWORD max = fast ? 1 * 1024 * 1024 : 64 * 1024 * 1024;
+  constexpr DWORD max = 64 * 1024 * 1024;
   WIN32_FIND_DATA fdat;
   HANDLE hfind = FindFirstFile(systemdirpattern, &fdat);
 
@@ -775,16 +729,19 @@ int main() {
     _sntprintf(m, ARRAYSIZE(m), _T(".%s (%lld%%)"), src, (tot * 100 / max));
 
     msg(m);
-    HANDLE hf =
-        CreateFile(src, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING,
-                   FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN, 0);
-    if (hf == INVALID_HANDLE_VALUE) continue;
 
     LARGE_INTEGER size;
-    if (!GetFileSizeEx(hf, &size)) continue;
+    {
+      handle_ptr<msg> hf{CreateFile(
+          src, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING,
+          FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_SEQUENTIAL_SCAN, 0)};
+      if (!hf) continue;
+
+      if (!GetFileSizeEx(hf.get(), &size)) continue;
+    }
 
     tot += size.QuadPart;
-    CloseHandle(hf);
+
     zr = ZipAdd(hz, dst, src);
     if (zr != ZR_OK) {
       _sntprintf(m, ARRAYSIZE(m), _T("* Failed to add %s to win.big"), src);
@@ -811,23 +768,15 @@ int main() {
   if (zr != ZR_OK) msg(_T("* Failed to unzip win.big"));
   zr = CloseZip(hz);
   if (zr != ZR_OK) msg(_T("* Failed to close big.zip"));
-  if (!fsame(_T("\\z\\win.big"), _T("\\z\\win.out.big")))
+  if (!fsame<msg>(_T("\\z\\win.big"), _T("\\z\\win.out.big")))
     msg(_T("* Failed to unzip all of win.big"));
   if (p_abort) return 1;
 
   if (any_errors) {
     msg(_T("Finished"));
     return 1;
-  } else {
-    msg(_T("Finished. No errors."));
-    return 0;
   }
-}
 
-// and when compiling for windows-ce we need winmain...
-#ifdef UNDER_CE
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
-  main();
+  msg(_T("Finished. No errors."));
   return 0;
 }
-#endif
