@@ -9,6 +9,7 @@ project(zip-utils LANGUAGES CXX)
 # it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
+# Use static MSVC runtime.
 option(ZU_ENABLE_STATIC_MSVC_RUNTIME "Build with static MSVC runtime." ON)
 
 # Use Address Sanitizer.
@@ -82,14 +83,18 @@ set(ZIP_UTILS_BINARY_DIR "${CMAKE_BINARY_DIR}" CACHE STRING
 set(ZIP_UTILS_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}" CACHE STRING
   "Name of the zip-utils build system.")
 
+set(ZU_ENABLE_STD_ONLY OFF)
+
 if (${ZIP_UTILS_SYSTEM_NAME} STREQUAL "Darwin")
   set(ZIP_UTILS_OS_MACOS ON CACHE BOOL "MacOS is build system.")
+  set(ZU_ENABLE_STD_ONLY ON)
 else()
   set(ZIP_UTILS_OS_MACOS OFF CACHE BOOL "MacOS is NOT build system.")
 endif()
 
 if (${ZIP_UTILS_SYSTEM_NAME} STREQUAL "Linux")
   set(ZIP_UTILS_OS_LINUX ON CACHE BOOL "Linux distro is build system.")
+  set(ZU_ENABLE_STD_ONLY ON)
 else()
   set(ZIP_UTILS_OS_LINUX OFF CACHE BOOL "Linux distro is NOT build system.")
 endif()
@@ -221,6 +226,11 @@ if (ZIP_UTILS_OS_WIN)
     ${ZIP_UTILS_BINARY_DIR}/manifests/enable-visual-styles.manifest
   )
 endif()
+
+if (ZU_ENABLE_STD_ONLY)
+  # Use only stdlib things.
+  add_compile_definitions(ZIP_STD=1)
+endif (ZU_ENABLE_STD_ONLY)
 
 # https://github.com/izenecloud/cmake/blob/master/SetCompilerWarningAll.cmake
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
