@@ -21,15 +21,21 @@ add_executable(${PACKAGE_NAME}
   ${ZIP_UTILS_ROOT_DIR}/XZip.cpp
   ${ZIP_UTILS_ROOT_DIR}/XUnzip.cpp
   std.cpp
-  resource.h
-  ${ZIP_UTILS_BINARY_DIR}/manifests/enable-visual-styles.manifest
-  ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/dpi-aware.manifest
-  ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/heap-type.manifest
-  ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/supported-os.manifest
-  ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/ultra-high-scroll-resolution.manifest
-  ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/utf-8-code-page.manifest
-  ${ZIP_UTILS_ROOT_DIR}/build/win/resource_scripts/windows_app_base.rc
 )
+
+if (ZIP_UTILS_OS_WIN)
+  target_sources(${PACKAGE_NAME}
+    PRIVATE
+      resource.h
+      ${ZIP_UTILS_BINARY_DIR}/manifests/enable-visual-styles.manifest
+      ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/dpi-aware.manifest
+      ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/heap-type.manifest
+      ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/supported-os.manifest
+      ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/ultra-high-scroll-resolution.manifest
+      ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/utf-8-code-page.manifest
+      ${ZIP_UTILS_ROOT_DIR}/build/win/resource_scripts/windows_app_base.rc
+  )
+endif (ZIP_UTILS_OS_WIN)
 
 target_include_directories(${PACKAGE_NAME}
   PRIVATE
