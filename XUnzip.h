@@ -67,35 +67,41 @@
 #ifdef ZIP_STD
 #include <cstdio>
 #include <ctime>
+
 using HZIP__ = struct HZIP__;
 /**
  * @brief An HZIP identifies a zip file that is being created.
  */
 using HZIP = struct HZIP__ *;
+
 #ifndef MAX_PATH
 #define MAX_PATH 1024
 #endif
-typedef unsigned long DWORD;
-typedef char TCHAR;
-typedef FILE *HANDLE;
-typedef time_t FILETIME;
-typedef FILETIME ZIP_FILETIME;
+
+using TCHAR = char;
+using HANDLE = FILE *;
+using FILETIME = time_t;
+using ZIP_FILETIME = FILETIME;
 #else
+
+#ifndef MAX_PATH
 #define MAX_PATH 260
+#endif
+
 using HZIP__ = struct HZIP__;
 /**
  * @brief An HZIP identifies a zip file that is being created.
  */
 using HZIP = struct HZIP__ *;
-typedef unsigned long DWORD;
 
 #ifdef _UNICODE
-typedef wchar_t TCHAR;
+using TCHAR = wchar_t;
 #else
-typedef char TCHAR;
+using TCHAR = char;
 #endif
 
-typedef void *HANDLE;
+using DWORD = unsigned long;
+using HANDLE = void *;
 
 /**
  * @brief Actually typedef for FILETIME on Windows.

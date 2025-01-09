@@ -295,7 +295,7 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   # Disable RTTI.
   string(REGEX REPLACE "-frtti" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
-  
+
   if (ZU_ENABLE_ASAN)
     message(STATUS "[options]: ASAN enabled.")
 
@@ -322,10 +322,13 @@ target_include_directories(${PACKAGE_NAME}
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
 )
 
-target_compile_definitions(${PACKAGE_NAME}
-  PRIVATE
-    _CRT_SECURE_NO_WARNINGS=1
-)
+if (ZIP_UTILS_OS_WIN)
+  target_compile_definitions(${PACKAGE_NAME}
+    PRIVATE
+      STRICT=1
+      _CRT_SECURE_NO_WARNINGS=1
+  )
+endif (ZIP_UTILS_OS_WIN)
 
 set_target_properties(${PACKAGE_NAME}
   PROPERTIES
@@ -350,7 +353,6 @@ if (BUILD_SHARED_LIBS)
 
   target_compile_definitions(${PACKAGE_NAME}
     PRIVATE
-      STRICT=1
       ZU_ZIP_BUILD_ITSELF=1
       ZU_ZIP_BUILD_SHARED=1
       ZU_UNZIP_BUILD_ITSELF=1

@@ -71,31 +71,35 @@
 #ifdef ZIP_STD
 #include <cstdio>
 #include <ctime>
+
 using HZIP__ = struct HZIP__;
 // An HZIP identifies a zip file that is being created.
 using HZIP = struct HZIP__ *;
 #ifndef MAX_PATH
 #define MAX_PATH 1024
 #endif
-typedef unsigned long DWORD;
-typedef char TCHAR;
-typedef FILE *HANDLE;
-typedef time_t FILETIME;
+using TCHAR = char;
+using HANDLE = FILE *;
+using FILETIME = time_t;
 #else
+#ifndef MAX_PATH
 #define MAX_PATH 260
+#endif
+
 using HZIP__ = struct HZIP__;
 // An HZIP identifies a zip file that is being created.
 using HZIP = struct HZIP__ *;
-typedef unsigned long DWORD;
 
 #ifdef _UNICODE
-typedef wchar_t TCHAR;
+using TCHAR = wchar_t;
 #else
-typedef char TCHAR;
+using TCHAR = char;
 #endif
 
-typedef void *HANDLE;
+using HANDLE = void *;
 #endif
+
+using DWORD = unsigned long;
 
 #include <cstddef>  // size_t
 
@@ -132,11 +136,20 @@ typedef void *HANDLE;
 
 #ifdef ZU_ZIP_BUILD_SHARED
 #ifdef ZU_ZIP_BUILD_ITSELF
+/*
+ * @brief Exports functions, data, and objects from a shared library.
+ */
 #define ZU_ZIP_ATTRIBUTE_SHARED ZU_ZIP_ATTRIBUTE_SHARED_EXPORT
 #else
+/*
+ * @brief Imports functions, data, and objects from a shared library.
+ */
 #define ZU_ZIP_ATTRIBUTE_SHARED ZU_ZIP_ATTRIBUTE_SHARED_IMPORT
 #endif
 #else
+/*
+ * @brief Nothing for static library.
+ */
 #define ZU_ZIP_ATTRIBUTE_SHARED
 #endif
 

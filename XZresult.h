@@ -1,4 +1,6 @@
-﻿#ifndef ZIP_UTILS_XZRESULT_H_
+﻿// Return codes from any of the zip functions.
+
+#ifndef ZIP_UTILS_XZRESULT_H_
 #define ZIP_UTILS_XZRESULT_H_
 
 typedef unsigned long DWORD;
