@@ -68,7 +68,6 @@ jobs:
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
         -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-        -DMPA_BUILD_WITHOUT_ATL=True
         -S ${{ github.workspace }}
 
     - name: Perform CodeQL Analysis
