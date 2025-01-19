@@ -24,7 +24,7 @@ if (POLICY CMP0025)
 endif()
 
 # Setup root directory of the zip-utils project.
-set(ZIP_UTILS_ROOT_DIR "${CMAKE_SOURCE_DIR}" CACHE STRING
+set(ZU_ROOT_DIR "${CMAKE_SOURCE_DIR}" CACHE STRING
   "Directory root of the zip-utils project.")
 
 ## Package information.
@@ -49,13 +49,13 @@ if (NOT DEFINED PACKAGE_VERSION)
   message(STATUS "[common]: Extracting Git software version.")
 
   if ("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Windows")
-    execute_process(COMMAND cmd /c "git rev-list --branches HEAD | find /v " " /c" OUTPUT_VARIABLE ZIP_UTILS_GIT_VERSION WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    execute_process(COMMAND cmd /c "git rev-list --branches HEAD | find /v " " /c" OUTPUT_VARIABLE ZU_GIT_VERSION WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   else()
-    execute_process(COMMAND bash "-c" "git rev-list --branches HEAD | wc -l | tr -d ' ' | tr -d '\n'" OUTPUT_VARIABLE ZIP_UTILS_GIT_VERSION WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    execute_process(COMMAND bash "-c" "git rev-list --branches HEAD | wc -l | tr -d ' ' | tr -d '\n'" OUTPUT_VARIABLE ZU_GIT_VERSION WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   endif()
 
   set(PACKAGE_VER_PATCH 2)
-  math(EXPR PACKAGE_VER_TWEAK ${ZIP_UTILS_GIT_VERSION})
+  math(EXPR PACKAGE_VER_TWEAK ${ZU_GIT_VERSION})
   message(STATUS
     "[common]: Build version from Git (patch.tweak): ${PACKAGE_VER_PATCH}.${PACKAGE_VER_TWEAK}.")
 
@@ -69,6 +69,14 @@ set(PACKAGE_STRING     "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 set(PACKAGE_TARNAME    "${PACKAGE_NAME}-${PACKAGE_VERSION}")
 set(PACKAGE_BUGREPORT  "https://github.com/Source-Authors/zip-utils/issues")
 
+# Default build type is Release unless overridden.
+# On Windows default is Debug, so need to unify.
+# See https://discourse.cmake.org/t/how-to-deal-with-ninja-setting-cmake-build-type-to-debug/281/3
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+  "Choose the type of build.")
+set(ZU_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
+  "CMake build type used to build ${PACKAGE_NAME}.")
+
 project(${PACKAGE_NAME}
   VERSION ${PACKAGE_VER_MAJOR}.${PACKAGE_VER_MINOR}.${PACKAGE_VER_PATCH}.${PACKAGE_VER_TWEAK}
   LANGUAGES CXX)
@@ -78,71 +86,69 @@ message(STATUS "[common]: ${PACKAGE_NAME} version: ${PACKAGE_VERSION}.")
 
 ## Common variables.
 
-set(ZIP_UTILS_BINARY_DIR "${CMAKE_BINARY_DIR}" CACHE STRING
+set(ZU_BINARY_DIR "${CMAKE_BINARY_DIR}" CACHE STRING
   "Directory of the zip-utils binaries output.")
-set(ZIP_UTILS_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}" CACHE STRING
+set(ZU_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}" CACHE STRING
   "Name of the zip-utils build system.")
 
 set(ZU_ENABLE_STD_ONLY OFF)
 
-if (${ZIP_UTILS_SYSTEM_NAME} STREQUAL "Darwin")
-  set(ZIP_UTILS_OS_MACOS ON CACHE BOOL "MacOS is build system.")
+if (${ZU_SYSTEM_NAME} STREQUAL "Darwin")
+  set(ZU_OS_MACOS ON CACHE BOOL "MacOS is build system.")
   set(ZU_ENABLE_STD_ONLY ON)
 else()
-  set(ZIP_UTILS_OS_MACOS OFF CACHE BOOL "MacOS is NOT build system.")
+  set(ZU_OS_MACOS OFF CACHE BOOL "MacOS is NOT build system.")
 endif()
 
-if (${ZIP_UTILS_SYSTEM_NAME} STREQUAL "Linux")
-  set(ZIP_UTILS_OS_LINUX ON CACHE BOOL "Linux distro is build system.")
+if (${ZU_SYSTEM_NAME} STREQUAL "Linux")
+  set(ZU_OS_LINUX ON CACHE BOOL "Linux distro is build system.")
   set(ZU_ENABLE_STD_ONLY ON)
 else()
-  set(ZIP_UTILS_OS_LINUX OFF CACHE BOOL "Linux distro is NOT build system.")
+  set(ZU_OS_LINUX OFF CACHE BOOL "Linux distro is NOT build system.")
 endif()
 
-if (${ZIP_UTILS_SYSTEM_NAME} STREQUAL "Windows")
-  set(ZIP_UTILS_OS_WIN ON CACHE BOOL "Windows is build system.")
+if (${ZU_SYSTEM_NAME} STREQUAL "Windows")
+  set(ZU_OS_WIN ON CACHE BOOL "Windows is build system.")
 else()
-  set(ZIP_UTILS_OS_WIN OFF CACHE BOOL "Windows is NOT build system.")
+  set(ZU_OS_WIN OFF CACHE BOOL "Windows is NOT build system.")
 endif()
 
-if (ZIP_UTILS_OS_MACOS OR ZIP_UTILS_OS_LINUX)
-  set(ZIP_UTILS_OS_POSIX ON CACHE BOOL "POSIX compatible os is build system.")
+if (ZU_OS_MACOS OR ZU_OS_LINUX)
+  set(ZU_OS_POSIX ON CACHE BOOL "POSIX compatible os is build system.")
 else()
-  set(ZIP_UTILS_OS_POSIX OFF CACHE BOOL "POSIX compatible os is NOT build system.")
+  set(ZU_OS_POSIX OFF CACHE BOOL "POSIX compatible os is NOT build system.")
 endif()
 
-set(ZIP_UTILS_PRODUCT_NAME "zip-utils" CACHE STRING
+set(ZU_PRODUCT_NAME "zip-utils" CACHE STRING
   "Name of the zip-utils product.")
 
-set(ZIP_UTILS_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
-  "CMake build type used to build ${PACKAGE_NAME}.")
-set(ZIP_UTILS_CMAKE_GENERATOR "${CMAKE_GENERATOR}" CACHE STRING
+set(ZU_CMAKE_GENERATOR "${CMAKE_GENERATOR}" CACHE STRING
   "CMake generator used to generate build tree." FORCE)
-set(ZIP_UTILS_CXX_COMPILER "${CMAKE_CXX_COMPILER}" CACHE STRING
+set(ZU_CXX_COMPILER "${CMAKE_CXX_COMPILER}" CACHE STRING
   "Compiler used to build ${PACKAGE_NAME}.")
-set(ZIP_UTILS_CXX_COMPILER_ID "${CMAKE_CXX_COMPILER_ID}" CACHE STRING
+set(ZU_CXX_COMPILER_ID "${CMAKE_CXX_COMPILER_ID}" CACHE STRING
   "Compiler id used to build ${PACKAGE_NAME}.")
-set(ZIP_UTILS_CXX_COMPILER_FRONTEND_VARIANT "${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}"
+set(ZU_CXX_COMPILER_FRONTEND_VARIANT "${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}"
   CACHE STRING "Compiler frontend used to build ${PACKAGE_NAME}.")
-set(ZIP_UTILS_EXPORT_COMPILE_COMMANDS ${CMAKE_EXPORT_COMPILE_COMMANDS} CACHE BOOL
+set(ZU_EXPORT_COMPILE_COMMANDS ${CMAKE_EXPORT_COMPILE_COMMANDS} CACHE BOOL
   "Enable/Disable output of compile commands during generation.")
 
-if (ZIP_UTILS_CXX_COMPILER_ID MATCHES "Clang")
-  set(ZIP_UTILS_COMPILER_CLANG ON CACHE BOOL "Compiler is Clang.")
+if (ZU_CXX_COMPILER_ID MATCHES "Clang")
+  set(ZU_COMPILER_CLANG ON CACHE BOOL "Compiler is Clang.")
 else()
-  set(ZIP_UTILS_COMPILER_CLANG OFF CACHE BOOL "Compiler is NOT Clang.")
+  set(ZU_COMPILER_CLANG OFF CACHE BOOL "Compiler is NOT Clang.")
 endif()
 
-if (ZIP_UTILS_CXX_COMPILER_ID STREQUAL "GNU")
-  set(ZIP_UTILS_COMPILER_GCC ON CACHE BOOL "Compiler is GCC.")
+if (ZU_CXX_COMPILER_ID STREQUAL "GNU")
+  set(ZU_COMPILER_GCC ON CACHE BOOL "Compiler is GCC.")
 else()
-  set(ZIP_UTILS_COMPILER_GCC OFF CACHE BOOL "Compiler is NOT GCC.")
+  set(ZU_COMPILER_GCC OFF CACHE BOOL "Compiler is NOT GCC.")
 endif()
 
-if (ZIP_UTILS_CXX_COMPILER_ID STREQUAL "MSVC")
-  set(ZIP_UTILS_COMPILER_MSVC ON CACHE BOOL "Compiler is MSVC.")
+if (ZU_CXX_COMPILER_ID STREQUAL "MSVC")
+  set(ZU_COMPILER_MSVC ON CACHE BOOL "Compiler is MSVC.")
 else()
-  set(ZIP_UTILS_COMPILER_MSVC OFF CACHE BOOL "Compiler is NOT MSVC.")
+  set(ZU_COMPILER_MSVC OFF CACHE BOOL "Compiler is NOT MSVC.")
 endif()
 
 ## Common dependencies.
@@ -154,76 +160,76 @@ if (Git_FOUND)
   # Get the current working branch.
   execute_process(
     COMMAND "${GIT_EXECUTABLE}" rev-parse --abbrev-ref HEAD
-    WORKING_DIRECTORY ${ZIP_UTILS_ROOT_DIR}
-    OUTPUT_VARIABLE ZIP_UTILS_GIT_BRANCH
+    WORKING_DIRECTORY ${ZU_ROOT_DIR}
+    OUTPUT_VARIABLE ZU_GIT_BRANCH
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   # Get the latest commit hash.
   execute_process(
     COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
-    WORKING_DIRECTORY ${ZIP_UTILS_ROOT_DIR}
-    OUTPUT_VARIABLE ZIP_UTILS_GIT_COMMIT_HASH
+    WORKING_DIRECTORY ${ZU_ROOT_DIR}
+    OUTPUT_VARIABLE ZU_GIT_COMMIT_HASH
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   # Get the subject of the commit.
   execute_process(
     COMMAND "${GIT_EXECUTABLE}" log -1 --format=%s
-    WORKING_DIRECTORY "${ZIP_UTILS_ROOT_DIR}"
-    OUTPUT_VARIABLE ZIP_UTILS_GIT_COMMIT_SUBJECT
+    WORKING_DIRECTORY "${ZU_ROOT_DIR}"
+    OUTPUT_VARIABLE ZU_GIT_COMMIT_SUBJECT
     ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   message(STATUS
-    "[common]: Git using branch '${ZIP_UTILS_GIT_BRANCH}', "
-    "commit ${ZIP_UTILS_GIT_COMMIT_HASH} | ${ZIP_UTILS_GIT_COMMIT_SUBJECT}.")
+    "[common]: Git using branch '${ZU_GIT_BRANCH}', "
+    "commit ${ZU_GIT_COMMIT_HASH} | ${ZU_GIT_COMMIT_SUBJECT}.")
 endif()
 
 message(STATUS
-  "[common]: ${PACKAGE_NAME} using CMake generator: ${ZIP_UTILS_CMAKE_GENERATOR}.")
+  "[common]: ${PACKAGE_NAME} using CMake generator: ${ZU_CMAKE_GENERATOR}.")
 
 # Select correct threading library.
-if (NOT ZIP_UTILS_OS_WIN)
+if (NOT ZU_OS_WIN)
   set(CMAKE_THREAD_PREFER_PTHREAD ON)
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 endif()
 find_package(Threads REQUIRED)
 list(APPEND CMAKE_REQUIRED_LIBRARIES Threads::Threads)
 if (NOT CMAKE_THREAD_LIBS_INIT)
-  set(ZIP_UTILS_THREADS_LIBRARY "system default" CACHE STRING
+  set(ZU_THREADS_LIBRARY "system default" CACHE STRING
     "Threads library used to build ${PACKAGE_NAME}.")
 else()
-  set(ZIP_UTILS_THREADS_LIBRARY "${CMAKE_THREAD_LIBS_INIT}" CACHE STRING
+  set(ZU_THREADS_LIBRARY "${CMAKE_THREAD_LIBS_INIT}" CACHE STRING
     "Threads library used to build ${PACKAGE_NAME}.")
 endif()
 message(STATUS
-  "[common]: ${PACKAGE_NAME} using threading library: ${ZIP_UTILS_THREADS_LIBRARY}.")
+  "[common]: ${PACKAGE_NAME} using threading library: ${ZU_THREADS_LIBRARY}.")
 
 if (XCODE_VERSION)
   message(STATUS
     "[common]: ${PACKAGE_NAME} using XCode version: ${XCODE_VERSION}.")
 endif()
 
-message(STATUS "[common]: ${PACKAGE_NAME} cxx compiler: ${ZIP_UTILS_CXX_COMPILER}.")
-message(STATUS "[common]: ${PACKAGE_NAME} build type: ${ZIP_UTILS_BUILD_TYPE}.")
+message(STATUS "[common]: ${PACKAGE_NAME} cxx compiler: ${ZU_CXX_COMPILER}.")
+message(STATUS "[common]: ${PACKAGE_NAME} build type: ${ZU_BUILD_TYPE}.")
 
-if (ZIP_UTILS_OS_WIN)
+if (ZU_OS_WIN)
   set(SRC_PRODUCT_NAME "Zip Utils")
 
   # Generate common product version info.
   configure_file(
-    ${ZIP_UTILS_ROOT_DIR}/build/product_version_config.h.cmake.in
-    ${ZIP_UTILS_BINARY_DIR}/build/product_version_config.h
+    ${ZU_ROOT_DIR}/build/product_version_config.h.cmake.in
+    ${ZU_BINARY_DIR}/build/product_version_config.h
   )
 
   # Generate app version info.
   configure_file(
-    ${ZIP_UTILS_ROOT_DIR}/build/app_version_config.h.cmake.in
-    ${ZIP_UTILS_BINARY_DIR}/build/app_version_config.h
+    ${ZU_ROOT_DIR}/build/app_version_config.h.cmake.in
+    ${ZU_BINARY_DIR}/build/app_version_config.h
   )
 
   # Generate visual styles manifest info.
   configure_file(
-    ${ZIP_UTILS_ROOT_DIR}/build/win/manifests/enable-visual-styles.manifest.cmake.in
-    ${ZIP_UTILS_BINARY_DIR}/manifests/enable-visual-styles.manifest
+    ${ZU_ROOT_DIR}/build/win/manifests/enable-visual-styles.manifest.cmake.in
+    ${ZU_BINARY_DIR}/manifests/enable-visual-styles.manifest
   )
 endif()
 
@@ -308,8 +314,8 @@ add_library(${PACKAGE_NAME} "")
 
 target_sources(${PACKAGE_NAME}
   PRIVATE
-    "XZip.cpp"
-    "XUnzip.cpp"
+    XZip.cpp
+    XUnzip.cpp
 
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/XZip.h>
@@ -322,13 +328,13 @@ target_include_directories(${PACKAGE_NAME}
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
 )
 
-if (ZIP_UTILS_OS_WIN)
+if (ZU_OS_WIN)
   target_compile_definitions(${PACKAGE_NAME}
     PRIVATE
       STRICT=1
       _CRT_SECURE_NO_WARNINGS=1
   )
-endif (ZIP_UTILS_OS_WIN)
+endif (ZU_OS_WIN)
 
 set_target_properties(${PACKAGE_NAME}
   PROPERTIES
@@ -337,18 +343,18 @@ set_target_properties(${PACKAGE_NAME}
 )
 
 if (BUILD_SHARED_LIBS)
-  if (ZIP_UTILS_OS_WIN)
+  if (ZU_OS_WIN)
     target_sources(${PACKAGE_NAME}
       PRIVATE
         resource.h
-        ${ZIP_UTILS_ROOT_DIR}/build/win/resource_scripts/windows_dll_base.rc
+        ${ZU_ROOT_DIR}/build/win/resource_scripts/windows_dll_base.rc
     )
-  endif (ZIP_UTILS_OS_WIN)
+  endif (ZU_OS_WIN)
 
   target_include_directories(${PACKAGE_NAME}
     PRIVATE
       ${PROJECT_SOURCE_DIR}
-      ${ZIP_UTILS_BINARY_DIR}/build
+      ${ZU_BINARY_DIR}/build
   )
 
   target_compile_definitions(${PACKAGE_NAME}
@@ -363,13 +369,13 @@ if (BUILD_SHARED_LIBS)
       ZU_UNZIP_BUILD_SHARED=1
   )
   
-  if (ZIP_UTILS_OS_WIN)
+  if (ZU_OS_WIN)
     target_compile_definitions(${PACKAGE_NAME}
       PRIVATE
         SRC_PRODUCT_INTERNAL_NAME_STRING="${PACKAGE_NAME}"
         SRC_PRODUCT_ORIGINAL_NAME_STRING="${PACKAGE_NAME}.dll"
     )
-  endif (ZIP_UTILS_OS_WIN)
+  endif (ZU_OS_WIN)
 endif(BUILD_SHARED_LIBS)
 
 if (ZU_ENABLE_UNIT_TESTS)
@@ -378,7 +384,7 @@ if (ZU_ENABLE_UNIT_TESTS)
   add_subdirectory(examples/modify)
   add_test(NAME zip-utils-modify COMMAND zip-utils-modify)
 
-  if (ZIP_UTILS_OS_WIN)
+  if (ZU_OS_WIN)
     add_subdirectory(examples/progress)
     add_test(NAME zip-utils-progress COMMAND zip-utils-progress)
 
@@ -387,8 +393,9 @@ if (ZU_ENABLE_UNIT_TESTS)
 
     add_subdirectory(examples/test)
     add_test(NAME zip-utils-test COMMAND zip-utils-test)
-  endif (ZIP_UTILS_OS_WIN)
+  endif (ZU_OS_WIN)
 
   add_subdirectory(examples/std)
   add_test(NAME zip-utils-std COMMAND zip-utils-std)
 endif (ZU_ENABLE_UNIT_TESTS)
+
